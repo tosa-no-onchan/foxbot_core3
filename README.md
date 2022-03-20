@@ -42,5 +42,9 @@ SBC に 自作 Stereo Camera や Depth Camera を取り付ければ、Turtlebot3
        ロボットの位置は、モータの駆動距離から、向きは IMU DMP 6軸 Fusion から計算して、Publish しています。  
        注) robot_localization/ekf_localization_node は、必要ありません。  
     3) Camera Info に同期して、/odom_fox , tf-base_footprint をパブリッシュします。  
+    
+難点.    
+ESP32 - Jetson Nano 2G の Serial通信に難あり。    
+ 
 
 
