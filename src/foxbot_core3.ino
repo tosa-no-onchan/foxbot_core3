@@ -496,44 +496,7 @@ void loop(){
 
 		tTime[2] = t + frequency_odometry_hz;	// set 1-cycle-time [ms] to odom Timer.
 
-		#if defined(CAMERA_SYNC) or defined(CAMERA_SYNC_EX)
-		// got camere info topic. 
-		if (camera_info_f == true){
-			// 自分(odom publish timestamp) の 時刻は、
-			double_t odom_time = odom.header.stamp.toSec();
-			// 自分 と camera info(publish timestamp) のズレは?
-			double_t pub_off = odom_time - camera_sync_time;
-			// 自分 が、遅れています。
-			// 時間のズレは、1 cycle 以内です?
-			if(pub_off > 0.0 && pub_off <= ((double_t)frequency_odometry_hz / 1000.0)){
-				// 自分 は、 camera info より 10[ms] より進んでいます。
-				if(pub_off > 0.010){
-					// 3[ms] 早くします。
-					tTime[2] = t + frequency_odometry_hz - 3;
-				}
-				// 自分 は、camera info より 3[ms] より進んでいます。
-				else if(pub_off > 0.003){
-					// 1[ms] 早くします。
-					tTime[2] = t + frequency_odometry_hz - 1;
-				}
-			}
-			// 自分 は、進んでいます。
-			// 時間のズレは、1 cycle 以内です?
-			else if(pub_off < 0.0 && pub_off >= ((double_t)frequency_odometry_hz / -1000.0)){
-				// 自分 は、camera info より 10[ms] より遅いです。
-				if(pub_off < -0.010){
-					// 3[ms] 遅くします。
-					tTime[2] = t + frequency_odometry_hz + 3;
-				}
-				// 自分(odom )は、camera info より 3[ms] より遅いです。
-				else if(pub_off <  -0.003){
-					// 1[ms] 遅くします。
-					tTime[2] = t + frequency_odometry_hz + 1;
-				}
-			}
-			camera_info_f=false;
-		}
-		#endif
+
 		t = millis();
     }
 
@@ -559,14 +522,56 @@ void loop(){
 	//}
 
 	// update subscribers values
-	//if(_frequency_rospinonce.delay(millis())) {
-	//if (t >= tTime[5]){
+	if (t >= tTime[5]){
 		nh.spinOnce();
 		// test by nishi
 		//uint8_t data[] = "hello4\r\n"; 
 		//nh.getHardware()->write(data,8);
-	    //tTime[5] = t + (1000 / FREQUENCY_ROSPINONCE_HZ);
-	//}
+	    tTime[5] = t + 2;	// wait 2[ms]
+	}
+
+	#if defined(CAMERA_SYNC) or defined(CAMERA_SYNC_EX)
+	// got camere info topic. 
+	if (camera_info_f == true){
+		// 自分(odom publish timestamp) の 時刻は、
+		double_t odom_time = odom.header.stamp.toSec();
+		// 自分 と camera info(publish timestamp) のズレは?
+		double_t pub_off = odom_time - camera_sync_time;
+		// 自分 が、遅れています。
+		// 時間のズレは、1 cycle 以内です?
+		if(pub_off > 0.0 && pub_off <= ((double_t)frequency_odometry_hz / 1000.0)){
+			// 自分 は、 camera info より 10[ms] より進んでいます。
+			if(pub_off > 0.010){
+				// 3[ms] 早くします。
+				//tTime[2] = t + frequency_odometry_hz - 3;
+				tTime[2] -= 3;
+			}
+			// 自分 は、camera info より 3[ms] より進んでいます。
+			else if(pub_off > 0.003){
+				// 1[ms] 早くします。
+				//tTime[2] = t + frequency_odometry_hz - 1;
+				tTime[2] -= 1;
+			}
+		}
+		// 自分 は、進んでいます。
+		// 時間のズレは、1 cycle 以内です?
+		else if(pub_off < 0.0 && pub_off >= ((double_t)frequency_odometry_hz / -1000.0)){
+			// 自分 は、camera info より 10[ms] より遅いです。
+			if(pub_off < -0.010){
+				// 3[ms] 遅くします。
+				//tTime[2] = t + frequency_odometry_hz + 3;
+				tTime[2] += 3;
+			}
+			// 自分(odom )は、camera info より 3[ms] より遅いです。
+			else if(pub_off <  -0.003){
+				// 1[ms] 遅くします。
+				//tTime[2] = t + frequency_odometry_hz + 1;
+				tTime[2] += 1;
+			}
+		}
+		camera_info_f=false;
+	}
+	#endif
 }
 
 void commandVelocityCallback(const geometry_msgs::Twist& cmd_vel_msg) {
