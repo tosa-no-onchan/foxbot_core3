@@ -39,6 +39,8 @@ SBC に 自作 Stereo Camera や Depth Camera を取り付ければ、Turtlebot3
     
     1) IMU:ICM-20948 DMP 6軸Fusion に対応しました。  
     2) IMU 6軸Fusion から、/odom_fox と tf-base_footprint の Orientationの向きに 値を設定しています。  
+       ロボットの位置は、モータの駆動距離から、向きは IMU DMP 6軸 Fusion から計算して、Publish しています。  
+       注) robot_localization/ekf_localization_node は、必要ありません。  
     3) Camera Info に同期して、/odom_fox , tf-base_footprint をパブリッシュします。  
 
 
