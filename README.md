@@ -36,5 +36,7 @@
 ### IMU サポートと SBC(Jetson Nano 2G) との Serial 通信をサポート。  
 Turtlebot3 としての機能を組み込みました。
 SBC に 自作 Stereo Camera や Depth Camera を取り付ければ、Turtlebot3 and rtabmap_ros を体験できます。  
+    
+    IMU:ICM-20948 に対応しました。    
 
 
