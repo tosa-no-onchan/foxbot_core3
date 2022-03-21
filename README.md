@@ -44,7 +44,21 @@ SBC に 自作 Stereo Camera や Depth Camera を取り付ければ、Turtlebot3
     3) Camera Info に同期して、/odom_fox , tf-base_footprint をパブリッシュします。  
     
 難点.    
-ESP32 - Jetson Nano 2G の Serial通信に難あり。    
+    
+    1) ESP32 - Jetson Nano 2G の Serial通信に難あり。    
+       時々ロボットの /odom_fox tf-base_footprintが通信断になります。        
+    2) ICM20948 DMP の初期化にかなりの頻度で失敗します。    
+       LED が点灯すると、初期化を失敗しているので、    
+       $ roslaunch turtlebot3_bringup turtlebot3_robot.launch  --screen    
+       を再度実行して下さい。    
+    
+Update.    
+    
+    2022.3.21    
+        /odom_fox tf-base_footprint の publish 時間のタイマーを milli sec から micro sec に変えて、    
+        精度を上げました。    
+    
+    
  
 
 
