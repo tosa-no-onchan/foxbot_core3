@@ -55,7 +55,8 @@ SemaphoreHandle_t xMutex = NULL;
 void update_motor(void *pvParameters){
 	xSemaphoreGive(xMutex);
 	while(1){
-		uint32_t t = millis();
+		//uint32_t t = millis();
+		unsigned long t = micros();
 
 		// rate computation
 		//if(_frequency_rate.delay(millis())) {
@@ -63,7 +64,8 @@ void update_motor(void *pvParameters){
 
 			//digitalWrite(RT_PIN0, HIGH);
 
-			float dt;
+			//float dt;
+			double dt;
 
 			motor_tic.left += motor_left_direction*motor_left_inc;	// add by nishi for joint state
 			motor_tic.right += motor_right_direction*motor_right_inc;	// add by nishi for joint state
@@ -74,10 +76,10 @@ void update_motor(void *pvParameters){
 			motor_right_filtered_direction = motor_right_direction_median_filter.out();
 
 			// filter increment per second
-			dt = (millis() - motor_right_prev_time);
-			motor_right_prev_time = millis();
+			dt = (micros() - motor_right_prev_time);
+			motor_right_prev_time = micros();
 			motor_right_filtered_inc_per_second = runningAverage(motor_right_filtered_inc_per_second,
-					(float)motor_right_inc / dt * 1000.0f, RATE_AVERAGE_FILTER_SIZE);
+					(float)motor_right_inc / dt * 1000000.0f, RATE_AVERAGE_FILTER_SIZE);
 
 			// estimated rate
 			motor_right_rate_est = (float)motor_right_filtered_direction
@@ -97,10 +99,10 @@ void update_motor(void *pvParameters){
 			motor_left_filtered_direction = motor_left_direction_median_filter.out();
 
 			// filter increment per second
-			dt = (millis() - motor_left_prev_time);
-			motor_left_prev_time = millis();
+			dt = (micros() - motor_left_prev_time);
+			motor_left_prev_time = micros();
 			motor_left_filtered_inc_per_second = runningAverage(motor_left_filtered_inc_per_second,
-					(float)motor_left_inc / dt * 1000.0f, RATE_AVERAGE_FILTER_SIZE);
+					(float)motor_left_inc / dt * 1000000.0f, RATE_AVERAGE_FILTER_SIZE);
 
 			// estimated rate
 			motor_left_rate_est = (float)motor_left_filtered_direction
@@ -119,8 +121,8 @@ void update_motor(void *pvParameters){
 									/ (WHEEL_RADIUS);
 			//digitalWrite(RT_PIN0, LOW);
 
-			tTime[0] = t + (1000 / FREQUENCY_RATE_HZ);
-			t = millis();
+			tTime[0] = t + (1000000UL / FREQUENCY_RATE_HZ);
+			t = micros();
 		}
 
 		// rate controler
@@ -161,8 +163,8 @@ void update_motor(void *pvParameters){
 			//debug_publisher2.publish(&debug_right);
 			//digitalWrite(RT_PIN1, LOW);
 
-			tTime[1] = t + (1000 / FREQUENCY_CONTROLLER_HZ);
-			t = millis();		// add by nishi 2022.3.18
+			tTime[1] = t + (1000000UL / FREQUENCY_CONTROLLER_HZ);
+			t = micros();		// add by nishi 2022.3.18
 		}
 
 		if (t >= tTime[4]){
@@ -178,7 +180,7 @@ void update_motor(void *pvParameters){
 			if(ok){
 				xSemaphoreGive(xMutex);
 			}
-			tTime[4] = t + (1000 / FREQUENCY_IMU_DATA_HZ);
+			tTime[4] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);
 		}
 		sensors.updateIMU();
 		//delay(1);
@@ -297,7 +299,7 @@ void setup(){
 	// Setting for SLAM and navigation (odometry, joint states, TF)
 	initOdom();
 	initJointStates();
-	prev_update_time = millis();
+	prev_update_time = micros();
     setup_end = true;
 	//Serial.println("setup end");
 	delay(100);
@@ -323,7 +325,7 @@ void setup(){
 		}
 	}
 
-	frequency_odometry_hz = (uint32_t)(1000.0f / FREQUENCY_ODOMETRY_HZ);	// 1 cycle time[ms] add by nishi 2022.3.5
+	frequency_odometry_hz = (unsigned long)(1000000.0 / FREQUENCY_ODOMETRY_HZ);	// 1 cycle time[micro sec] add by nishi 2022.3.21
 	frequency_odometry_hz_ave = frequency_odometry_hz;
 	setup_end = true;
 }
@@ -357,16 +359,21 @@ void loop(){
 
 	//sensors.updateIMU();
 
-	uint32_t t = millis();
+	//uint32_t t = millis();
+	unsigned long t = micros();
 
 	// update odometry
 	if (t >= tTime[2]){
-		float dt, dx, dy, dz;
-		float qw, qx, qy, qz;
+		//float dt, dx, dy, dz;
+		double dt, dx, dy, dz;
+		//float qw, qx, qy, qz;
+		double qw, qx, qy, qz;
 		double roll, pitch, yaw;
 
-		dt = (float)(millis() - odom_prev_time) * 0.001f;
-		odom_prev_time = millis();
+		//dt = (float)(millis() - odom_prev_time) * 0.001f;
+		dt = (double)(micros() - odom_prev_time) * 0.000001;	// dt[Sec]
+		//odom_prev_time = millis();
+		odom_prev_time = micros();
 
 		// compute linear and angular estimated velocity
 		linear_velocity_est = WHEEL_RADIUS * (motor_right_rate_est + motor_left_rate_est) / 2.0f;
@@ -380,9 +387,9 @@ void loop(){
 		dz = 0.0;
 
 		// DEBUG
-		debug_left.y = yaw_est * 57.2958;
-		debug_left.z = angular_velocity_est * dt;
-		debug_publisher1.publish(&debug_left);
+		//debug_left.y = yaw_est * 57.2958;
+		//debug_left.z = angular_velocity_est * dt;
+		//debug_publisher1.publish(&debug_left);
 
 		#ifndef ODOM_USE_IMU
 		// compute quaternion
@@ -419,17 +426,17 @@ void loop(){
 		sensors.imu_.QuaternionToEulerAngles(qw, qx, qy, qz,roll, pitch, yaw);
 		dz = linear_velocity_est * dt * pitch;
 
-		dzi[0] =(int32_t)roundf(dz*1000.0);
+		//dzi[0] =(int32_t)roundf(dz*1000.0);
 		//dz = (double)dzl / 1000.0;
 
-		dzi_sum=0;
-		for (int i=0; i<2; i++){
-			dzi_sum += dzi[i];
-		}
-		dz = (double)(dzi_sum/2) / 1000.0;
-		for (int i=2-1; i>0; i--){
-			dzi[i] = dzi[i-1];
-		}
+		//dzi_sum=0;
+		//for (int i=0; i<2; i++){
+		//	dzi_sum += dzi[i];
+		//}
+		//dz = (double)(dzi_sum/2) / 1000.0;
+		//for (int i=2-1; i>0; i--){
+		//	dzi[i] = dzi[i-1];
+		//}
 
 		#endif
 
@@ -496,8 +503,7 @@ void loop(){
 
 		tTime[2] = t + frequency_odometry_hz;	// set 1-cycle-time [ms] to odom Timer.
 
-
-		t = millis();
+		t = micros();
     }
 
 	// Update the IMU unit.	add by nishi 2021.7.5
@@ -513,7 +519,7 @@ void loop(){
 		#ifdef USE_MAG
 	    publishMagMsg();
 		#endif
-	    tTime[3] = t + (1000 / FREQUENCY_IMU_PUBLISH_HZ);
+	    tTime[3] = t + (1000000UL / FREQUENCY_IMU_PUBLISH_HZ);
 		//t = millis();		// comment in by nishi 2022.3.18
 	}
 
@@ -537,36 +543,63 @@ void loop(){
 		double_t odom_time = odom.header.stamp.toSec();
 		// 自分 と camera info(publish timestamp) のズレは?
 		double_t pub_off = odom_time - camera_sync_time;
-		// 自分 が、遅れています。
+
+		// 自分 が、進んでいます。
+		if(pub_off > 0.0){
 		// 時間のズレは、1 cycle 以内です?
-		if(pub_off > 0.0 && pub_off <= ((double_t)frequency_odometry_hz / 1000.0)){
-			// 自分 は、 camera info より 10[ms] より進んでいます。
-			if(pub_off > 0.010){
-				// 3[ms] 早くします。
-				//tTime[2] = t + frequency_odometry_hz - 3;
-				tTime[2] -= 3;
+		//if(pub_off > 0.0 && pub_off <= ((double_t)frequency_odometry_hz / 1000000.0)){
+			// 自分 は、 camera info より 1 cycle より進んでいます。
+			if(pub_off > ((double_t)frequency_odometry_hz / 1000000.0)){
+				// 5[milli sec] 早くします。
+				//tTime[2] = t + frequency_odometry_hz - 5000;
+				tTime[2] -= 5000;
 			}
-			// 自分 は、camera info より 3[ms] より進んでいます。
-			else if(pub_off > 0.003){
-				// 1[ms] 早くします。
-				//tTime[2] = t + frequency_odometry_hz - 1;
-				tTime[2] -= 1;
+			// 自分 は、 camera info より 10[ms] より進んでいます。
+			else if(pub_off > 0.010){
+				// 1[milli sec] 早くします。
+				//tTime[2] = t + frequency_odometry_hz - 1000;
+				tTime[2] -= 1000;
+			}
+			// 自分 は、camera info より 1[ms] より進んでいます。
+			else if(pub_off > 0.001){
+				// 100[micro sec] 早くします。
+				//tTime[2] = t + frequency_odometry_hz - 100;
+				tTime[2] -= 100;
+			}
+			// 自分 は、camera info より 0.1[ms] より進んでいます。
+			else if(pub_off > 0.0001){
+				// 10[micro sec] 早くします。
+				//tTime[2] = t + frequency_odometry_hz - 10;
+				tTime[2] -= 10;
 			}
 		}
-		// 自分 は、進んでいます。
+		// 自分 は、遅れています。
+		else if(pub_off < 0.0){
 		// 時間のズレは、1 cycle 以内です?
-		else if(pub_off < 0.0 && pub_off >= ((double_t)frequency_odometry_hz / -1000.0)){
-			// 自分 は、camera info より 10[ms] より遅いです。
-			if(pub_off < -0.010){
-				// 3[ms] 遅くします。
-				//tTime[2] = t + frequency_odometry_hz + 3;
-				tTime[2] += 3;
+		//else if(pub_off < 0.0 && pub_off >= ((double_t)frequency_odometry_hz / -1000000.0)){
+			// 自分 は、camera info より 1 cycle より遅いです。
+			if(pub_off < ((double_t)frequency_odometry_hz / -1000000.0)){
+				// 5[milli sec] 遅くします。
+				//tTime[2] = t + frequency_odometry_hz + 5000;
+				tTime[2] += 5000;
 			}
-			// 自分(odom )は、camera info より 3[ms] より遅いです。
-			else if(pub_off <  -0.003){
-				// 1[ms] 遅くします。
-				//tTime[2] = t + frequency_odometry_hz + 1;
-				tTime[2] += 1;
+			// 自分 は、camera info より 10[ms] より遅いです。
+			else if(pub_off < -0.010){
+				// 1[milli sec] 遅くします。
+				//tTime[2] = t + frequency_odometry_hz + 1000;
+				tTime[2] += 1000;
+			}
+			// 自分(odom )は、camera info より 1[ms] より遅いです。
+			else if(pub_off <  -0.001){
+				// 100[micro sec] 遅くします。
+				//tTime[2] = t + frequency_odometry_hz + 100;
+				tTime[2] += 100;
+			}
+			// 自分(odom )は、camera info より 0.1[ms] より遅いです。
+			else if(pub_off <  -0.0001){
+				// 10[micro sec] 遅くします。
+				//tTime[2] = t + frequency_odometry_hz + 10;
+				tTime[2] += 10;
 			}
 		}
 		camera_info_f=false;
@@ -597,9 +630,9 @@ void cameraSyncCallback(const sensor_msgs::CameraInfo& camera_info_msg){
 				uint32_t cnt = camera_info_msg.header.seq - prev_cinfo_sec;
 				double_t rate = (double_t)cnt / off_time;	// camera info publish rate [Hz]
 				if(rate >= 3.0 && rate <= 60.0){
-					frequency_odometry_hz_ave += (uint32_t)(1000.0f / rate);
+					frequency_odometry_hz_ave += (unsigned long)(1000000.0 / rate);
 					frequency_odometry_hz_ave /= 2; 
-					frequency_odometry_hz = frequency_odometry_hz_ave;	// 1 cycle time [ms]
+					frequency_odometry_hz = frequency_odometry_hz_ave;	// 1 cycle time [micro sec]
 				}
 			}
 		}
@@ -616,7 +649,7 @@ void cameraSyncCallback(const sensor_msgs::Temperature& temp_msg){
 	camera_sync_time = temp_msg.header.stamp.toSec();
 	camera_cap_hz = temp_msg.temperature;	// get camera caption rate [Hz]
 	if(camera_cap_hz > 0.0){
-		frequency_odometry_hz = (uint32_t)(1000.0f / camera_cap_hz);	// add by nishi 2022.3.6
+		frequency_odometry_hz = (unsigned long)(1000000.0 / camera_cap_hz);	// add by nishi 2022.3.6
 	}
 }
 #endif

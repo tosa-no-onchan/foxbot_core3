@@ -71,19 +71,19 @@
 
 
 /* Global parameters */
-//#define FREQUENCY_RATE 						30 			// [ms] default 50ms
+//#define FREQUENCY_RATE 					30 			// [ms] default 50ms
 #define FREQUENCY_RATE 						20 			// [ms] default 50ms
-#define FREQUENCY_RATE_HZ 						50 			// 20[ms] -> 50[Hz]
+#define FREQUENCY_RATE_HZ 					50 			// 20[ms] -> 50[Hz]
 
-//#define FREQUENCY_ODOMETRY 				    150 		// [ms] default 250ms
+//#define FREQUENCY_ODOMETRY 				150 		// [ms] default 250ms
 // test by nishi 2021.10.9
-//#define FREQUENCY_ODOMETRY 				    200 		// [ms] default 250ms
-//#define FREQUENCY_ODOMETRY 				    190 		// [ms] default 250ms
-//#define FREQUENCY_ODOMETRY 				    160 		// [ms] default 250ms
+//#define FREQUENCY_ODOMETRY 				200 		// [ms] default 250ms
+//#define FREQUENCY_ODOMETRY 				190 		// [ms] default 250ms
+//#define FREQUENCY_ODOMETRY 				160 		// [ms] default 250ms
 
-//#define FREQUENCY_ODOMETRY_HZ               30   // 30[hz]  Act 25[hz]
-//#define FREQUENCY_ODOMETRY_HZ               15   // 15[hz]  Act 25[hz]
-#define FREQUENCY_ODOMETRY_HZ               13.6f   // 13.6[hz]
+//#define FREQUENCY_ODOMETRY_HZ             30   // 30[hz]  Act 25[hz]
+//#define FREQUENCY_ODOMETRY_HZ             15   // 15[hz]  Act 25[hz]
+#define FREQUENCY_ODOMETRY_HZ               13.0d   // 13.6[hz]
 
 #define FREQUENCY_ODOMETRY 				    33 		// [ms] default 250ms
 
@@ -390,10 +390,13 @@ double odom_vel[3];
 /*******************************************************************************
 * SoftwareTimer of Turtlebot3
 *******************************************************************************/
-static uint32_t tTime[10]={0,0,0,0,0,0,0,0,0,0};
+//static uint32_t tTime[10]={0,0,0,0,0,0,0,0,0,0};
+static unsigned long tTime[10]={0,0,0,0,0,0,0,0,0,0};
 
-uint32_t frequency_odometry_hz;     // FREQUENCY_ODOMETRY_HZ
-uint32_t frequency_odometry_hz_ave; // FREQUENCY_ODOMETRY_HZ average
+//uint32_t frequency_odometry_hz;     // FREQUENCY_ODOMETRY_HZ
+unsigned long frequency_odometry_hz;     // FREQUENCY_ODOMETRY_HZ
+//uint32_t frequency_odometry_hz_ave; // FREQUENCY_ODOMETRY_HZ average
+unsigned long frequency_odometry_hz_ave; // FREQUENCY_ODOMETRY_HZ average
 
 /*******************************************************************************
 * Calculation for odometry
