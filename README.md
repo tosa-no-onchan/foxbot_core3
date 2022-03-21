@@ -45,7 +45,7 @@ SBC に 自作 Stereo Camera や Depth Camera を取り付ければ、Turtlebot3
     
 ### SBC(Jetson Nano 2G) rtabmap_ros with 自作 Stereo Camera    
 SBC(Jestosn Nano 2G + ESP32 Seial) で、Turtlebot3 with ratbmap_ros Stereo camera が実行できます。    
-[rtabmap_ros_my](https://github.com/tosa-no-onchan/rtabmap_ros_my/blob/main/launch/rtabmap-nishi_stereo_outdoor2_bx3_navi.launch) を、参考にして下さい。    
+[rtabmap_ros_my/launch/rtabmap-nishi_stereo_outdoor2_bx3_navi.launch](https://github.com/tosa-no-onchan/rtabmap_ros_my/blob/main/launch/rtabmap-nishi_stereo_outdoor2_bx3_navi.launch) を、参考にして下さい。    
     
 難点.    
     
