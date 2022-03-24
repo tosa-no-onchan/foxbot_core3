@@ -545,17 +545,17 @@ void loop(){
 		double_t pub_off = odom_time - camera_sync_time;
 
 		// 自分 が、進んでいます。
-		if(pub_off > 0.0){
+		//if(pub_off > 0.0){
 		// 時間のズレは、1 cycle 以内です?
-		//if(pub_off > 0.0 && pub_off <= ((double_t)frequency_odometry_hz / 1000000.0)){
+		if(pub_off > 0.0 && pub_off <= ((double_t)frequency_odometry_hz / 1000000.0)){
 			// 自分 は、 camera info より 1 cycle より進んでいます。
-			if(pub_off > ((double_t)frequency_odometry_hz / 1000000.0)){
+			//if(pub_off > ((double_t)frequency_odometry_hz / 1000000.0)){
 				// 5[milli sec] 早くします。
 				//tTime[2] = t + frequency_odometry_hz - 5000;
-				tTime[2] -= 5000;
-			}
+			//	tTime[2] -= 5000;
+			//}
 			// 自分 は、 camera info より 10[ms] より進んでいます。
-			else if(pub_off > 0.010){
+			if(pub_off > 0.010){
 				// 1[milli sec] 早くします。
 				//tTime[2] = t + frequency_odometry_hz - 1000;
 				tTime[2] -= 1000;
@@ -574,17 +574,17 @@ void loop(){
 			}
 		}
 		// 自分 は、遅れています。
-		else if(pub_off < 0.0){
+		//else if(pub_off < 0.0){
 		// 時間のズレは、1 cycle 以内です?
-		//else if(pub_off < 0.0 && pub_off >= ((double_t)frequency_odometry_hz / -1000000.0)){
+		else if(pub_off < 0.0 && pub_off >= ((double_t)frequency_odometry_hz / -1000000.0)){
 			// 自分 は、camera info より 1 cycle より遅いです。
-			if(pub_off < ((double_t)frequency_odometry_hz / -1000000.0)){
+			//if(pub_off < ((double_t)frequency_odometry_hz / -1000000.0)){
 				// 5[milli sec] 遅くします。
 				//tTime[2] = t + frequency_odometry_hz + 5000;
-				tTime[2] += 5000;
-			}
+			//	tTime[2] += 5000;
+			//}
 			// 自分 は、camera info より 10[ms] より遅いです。
-			else if(pub_off < -0.010){
+			if(pub_off < -0.010){
 				// 1[milli sec] 遅くします。
 				//tTime[2] = t + frequency_odometry_hz + 1000;
 				tTime[2] += 1000;

@@ -306,6 +306,7 @@ ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("/cmd_vel", commandVelocityCal
 // callback function prototype
 void cameraSyncCallback(const sensor_msgs::CameraInfo& camera_info_msg);
 ros::Subscriber<sensor_msgs::CameraInfo> camera_sync_sub("/rgb/camera_info", cameraSyncCallback);
+//ros::Subscriber<sensor_msgs::CameraInfo> camera_sync_sub("/stereo_publisher/stereo/camera_info", cameraSyncCallback);
 
 #elif defined(CAMERA_SYNC_EX)
 /*  for OAK-D=Lite */
