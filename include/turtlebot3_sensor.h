@@ -21,20 +21,10 @@
 #define TURTLEBOT3_SENSOR_H_
 
 
-//#define Teensy_ICM
-
-#ifdef Teensy_ICM
-#include <inttypes.h>
-#include <Arduino.h>
-//#include <SPI.h>
-#include <Teensy-ICM-20948.h>
-
-#else
 #include <IMU.h>
 //#include <MPU9250_asukiaaa.h>
 //#include <SparkFunMPU9250-DMP.h>
 
-#endif
 
 #ifndef TRUE
 #define TRUE true
@@ -130,9 +120,7 @@ class Turtlebot3Sensor
   void initLED(void);
   void setLedPattern(double linear_vel, double angular_vel);
 
-  #ifndef Teensy_ICM
   cIMU imu_;
-  #endif
 
 
  private:
@@ -144,32 +132,9 @@ class Turtlebot3Sensor
   #endif
   sensor_msgs::MagneticField mag_msg_;
 
-  #ifdef Teensy_ICM
-
-  TeensyICM20948Settings icmSettings =
-  {
-    //.cs_pin = 10,                   // SPI chip select pin
-    .cs_pin = 5,                   // SPI chip select pin
-    .spi_speed = 7000000,           // SPI clock speed in Hz, max speed is 7MHz
-    .mode = 1,                      // 0 = low power mode, 1 = high performance mode
-    .enable_gyroscope = false,      // Enables gyroscope output
-    .enable_accelerometer = false,  // Enables accelerometer output
-    .enable_magnetometer = false,   // Enables magnetometer output
-    .enable_quaternion = true,      // Enables quaternion output
-    .gyroscope_frequency = 1,       // Max frequency = 225, min frequency = 1
-    .accelerometer_frequency = 1,   // Max frequency = 225, min frequency = 1
-    .magnetometer_frequency = 1,    // Max frequency = 70, min frequency = 1
-    .quaternion_frequency = 225     // Max frequency = 225, min frequency = 50
-  };
-
-  TeensyICM20948 imu_;
-  float qw, qx, qy, qz;
-
-  #else
   //cIMU imu_;
   // changed by nishi
   //OLLO ollo_;
-  #endif
 
   float quat[4];  // add by nishi 2021.12.25
 

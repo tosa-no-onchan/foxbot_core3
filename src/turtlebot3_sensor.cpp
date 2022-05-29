@@ -57,11 +57,7 @@ bool Turtlebot3Sensor::init(unsigned long baud)
   battery_state_msg_.design_capacity = NAN;
   battery_state_msg_.percentage      = NAN;
 
-  #if defined Teensy_ICM
-  imu_.init(icmSettings);
-  #else
-  get_error_code = imu_.begin();
-  #endif
+  get_error_code = imu_.begin(206);
 
   #ifdef DEBUG_N
   if (get_error_code != 0x00)
@@ -74,81 +70,23 @@ bool Turtlebot3Sensor::init(unsigned long baud)
 }
 
 void Turtlebot3Sensor::initIMU(void){
-  #if defined Teensy_ICM
-  imu_.init(icmSettings);
-  #else
-  imu_.begin();
-  #endif
+  imu_.begin(206);
 }
 
 #define LED_BUILTIN 17
 //#define LED_BUILTIN 4
 
 void Turtlebot3Sensor::updateIMU(void){
-  #if defined Teensy_ICM
-  // Must call this often in main loop -- updates the sensor values
-  imu_.task();
-  #else
   imu_.update();
-  #endif
 }
 
 void Turtlebot3Sensor::copyIMU(void){
-  #if defined Teensy_ICM
-  //char sensor_string_buff[200];
-  if (imu_.quatDataIsReady()){
-    imu_.readQuatData(&qw, &qx, &qy, &qz);
-
-    // Store data in a JSON string and send it over the serial port
-    //sprintf(sensor_string_buff, "{\"quat_w\":%f, \"quat_x\":%f, \"quat_y\":%f, \"quat_z\":%f}", qw, qx, qy, qz);
-    //Serial.println(sensor_string_buff);
-
-    quat[0]=qw;
-    quat[1]=qx;
-    quat[2]=qy;
-    quat[3]=qz;
-  }
-  else{
-    digitalWrite(LED_BUILTIN, HIGH-digitalRead(LED_BUILTIN));   // blink the blue
-  }
-  #else
   quat[0]=imu_.quat[0];
   quat[1]=imu_.quat[1];
   quat[2]=imu_.quat[2];
   quat[3]=imu_.quat[3];
-  #endif
 }
 
-#ifdef Teensy_ICM
-void Turtlebot3Sensor::calibrationGyro()
-{
-  uint32_t pre_time;
-  uint32_t t_time;
-
-  const uint8_t led_ros_connect = 3;
-
-  int cnt=500;
-
-  t_time   = millis();
-  pre_time = millis();
-
-  while(cnt>0)
-  {
-    imu_.task();
-
-    if (millis()-pre_time > 5000)
-    {
-      break;
-    }
-    if (millis()-t_time > 100)
-    {
-      t_time = millis();
-      //setLedToggle(led_ros_connect);
-    }
-    cnt--;
-  }
-}
-#else
 void Turtlebot3Sensor::calibrationGyro()
 {
   uint32_t pre_time;
@@ -176,30 +114,8 @@ void Turtlebot3Sensor::calibrationGyro()
     }
   }
 }
-#endif
 
 
-#ifdef Teensy_ICM
-sensor_msgs::Imu Turtlebot3Sensor::getIMU(void)
-{
-  imu_msg_.orientation.w = quat[0];
-  imu_msg_.orientation.x = quat[1];
-  imu_msg_.orientation.y = quat[2];
-  imu_msg_.orientation.z = quat[3];
-
-  imu_msg_.orientation_covariance[0] = 0.0025;
-  imu_msg_.orientation_covariance[1] = 0;
-  imu_msg_.orientation_covariance[2] = 0;
-  imu_msg_.orientation_covariance[3] = 0;
-  imu_msg_.orientation_covariance[4] = 0.0025;
-  imu_msg_.orientation_covariance[5] = 0;
-  imu_msg_.orientation_covariance[6] = 0;
-  imu_msg_.orientation_covariance[7] = 0;
-  imu_msg_.orientation_covariance[8] = 0.0025;
-
-  return imu_msg_;
-}
-#else
 sensor_msgs::Imu Turtlebot3Sensor::getIMU(void)
 {
   imu_msg_.angular_velocity.x = imu_.SEN.gyroADC[0] * GYRO_FACTOR;
@@ -263,39 +179,24 @@ sensor_msgs::Imu Turtlebot3Sensor::getIMU(void)
 
   return imu_msg_;
 }
-#endif
 
 float* Turtlebot3Sensor::getOrientation(void)
 {
   static float orientation[4];
 
-  #ifdef Teensy_ICM
-  orientation[0] = 0.0;
-  orientation[1] = 0.0;
-  orientation[2] = 0.0;
-  orientation[3] = 0.0;
-  #else
   orientation[0] = imu_.quat[0];
   orientation[1] = imu_.quat[1];
   orientation[2] = imu_.quat[2];
   orientation[3] = imu_.quat[3];
-  #endif
 
   return orientation;
 }
 
 sensor_msgs::MagneticField Turtlebot3Sensor::getMag(void)
 {
-  #ifdef Teensy_ICM
-  mag_msg_.magnetic_field.x = 0.0;
-  mag_msg_.magnetic_field.y = 0.0;
-  mag_msg_.magnetic_field.z = 0.0;
-
-  #else
   mag_msg_.magnetic_field.x = imu_.SEN.magADC[0] * MAG_FACTOR;
   mag_msg_.magnetic_field.y = imu_.SEN.magADC[1] * MAG_FACTOR;
   mag_msg_.magnetic_field.z = imu_.SEN.magADC[2] * MAG_FACTOR;
-  #endif
 
   mag_msg_.magnetic_field_covariance[0] = 0.0048;
   mag_msg_.magnetic_field_covariance[1] = 0;

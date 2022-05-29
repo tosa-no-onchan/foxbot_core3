@@ -23,8 +23,8 @@
 #define FOXBOT_CORE_CONFIG_H_
 
 #if defined(BOARD_DUEUSB)
-// enable this line for Arduino Due
-#define USE_USBCON
+    // enable this line for Arduino Due
+    #define USE_USBCON
 #endif
 
 /* Include librairies */
@@ -41,7 +41,7 @@
 #include <tf/transform_broadcaster.h>
 #include <sensor_msgs/JointState.h>
 #if defined(CAMERA_SYNC)
-#include <sensor_msgs/CameraInfo.h>
+    #include <sensor_msgs/CameraInfo.h>
 #endif
 
 #include <turtlebot3_msgs/SensorState.h>
@@ -82,8 +82,8 @@
 //#define FREQUENCY_ODOMETRY 				160 		// [ms] default 250ms
 
 //#define FREQUENCY_ODOMETRY_HZ             30   // 30[hz]  Act 25[hz]
-//#define FREQUENCY_ODOMETRY_HZ             15   // 15[hz]  Act 25[hz]
-#define FREQUENCY_ODOMETRY_HZ               13.0d   // 13.6[hz]
+#define FREQUENCY_ODOMETRY_HZ             15.0d   // 15[hz]  Act 25[hz]
+//#define FREQUENCY_ODOMETRY_HZ               13.0d   // 13.6[hz]
 
 #define FREQUENCY_ODOMETRY 				    33 		// [ms] default 250ms
 
@@ -156,51 +156,51 @@ MedianFilter motor_left_direction_median_filter(RATE_DIRECTION_MEDIAN_FILTER_SIZ
 
 
 #if defined(BOARD_BLACKPILL) or defined(BOARD_F407VG)
-/* Define pins */
-// motor A (right)
-const byte motorRightEncoderPinA = PB3;  // Encode IN  Digital IN (C1)  --> PB3
-const byte motorRightEncoderPinB = PB4;   // Encode IN Digital IN (C2) --> PB4
-const byte enMotorRight = PB7;    // moter speed Analog(PWM) OUT  --> PB7
-const byte in1MotorRight = PB14;   // Forward Switch  Digital OUT  --> PB14
-const byte in2MotorRight = PB13;   // Backward Switch Digital OUT  --> PB13
+    /* Define pins */
+    // motor A (right)
+    const byte motorRightEncoderPinA = PB3;  // Encode IN  Digital IN (C1)  --> PB3
+    const byte motorRightEncoderPinB = PB4;   // Encode IN Digital IN (C2) --> PB4
+    const byte enMotorRight = PB7;    // moter speed Analog(PWM) OUT  --> PB7
+    const byte in1MotorRight = PB14;   // Forward Switch  Digital OUT  --> PB14
+    const byte in2MotorRight = PB13;   // Backward Switch Digital OUT  --> PB13
 
-// motor B (left)
-const byte motorLeftEncoderPinA = PB9;  // Encode IN Digital IN (C2)  --> PB9
-const byte motorLeftEncoderPinB = PB8;  // Encode IN Digital IN (C1)  --> PB8
-const byte enMotorLeft = PB6;      // morter speed Analog(PWM) OUT  --> PB6
-const byte in1MotorLeft = PA15;    // Forward Switch  Digital OUT  --> PA15
-const byte in2MotorLeft = PB15;    // Backward Switch Digital OUT  --> PB15
+    // motor B (left)
+    const byte motorLeftEncoderPinA = PB9;  // Encode IN Digital IN (C2)  --> PB9
+    const byte motorLeftEncoderPinB = PB8;  // Encode IN Digital IN (C1)  --> PB8
+    const byte enMotorLeft = PB6;      // morter speed Analog(PWM) OUT  --> PB6
+    const byte in1MotorLeft = PA15;    // Forward Switch  Digital OUT  --> PA15
+    const byte in2MotorLeft = PB15;    // Backward Switch Digital OUT  --> PB15
 
 #elif defined(BOARD_ESP32)
-/* Define pins */
-// motor A (right)
-const byte motorRightEncoderPinA = 36;  // Encode IN  Digital IN (C1)  --> PB3
-const byte motorRightEncoderPinB = 39;   // Encode IN Digital IN (C2) --> PB4
-const byte enMotorRight = 33;    // moter speed Analog(PWM) OUT  --> PB7
-const byte in1MotorRight = 26;   // Forward Switch  Digital OUT  --> PB14
-const byte in2MotorRight = 25;   // Backward Switch Digital OUT  --> PB13
+    /* Define pins */
+    // motor A (right)
+    const byte motorRightEncoderPinA = 36;  // Encode IN  Digital IN (C1)  --> PB3
+    const byte motorRightEncoderPinB = 39;   // Encode IN Digital IN (C2) --> PB4
+    const byte enMotorRight = 33;    // moter speed Analog(PWM) OUT  --> PB7
+    const byte in1MotorRight = 26;   // Forward Switch  Digital OUT  --> PB14
+    const byte in2MotorRight = 25;   // Backward Switch Digital OUT  --> PB13
 
-// motor B (left)
-const byte motorLeftEncoderPinA = 35;  // Encode IN Digital IN (C2)  --> PB9
-const byte motorLeftEncoderPinB = 34;  // Encode IN Digital IN (C1)  --> PB8
-const byte enMotorLeft = 13;      // morter speed Analog(PWM) OUT  --> PB6
-const byte in1MotorLeft = 14;    // Forward Switch  Digital OUT  --> PA15
-const byte in2MotorLeft = 27;    // Backward Switch Digital OUT  --> PB15
+    // motor B (left)
+    const byte motorLeftEncoderPinA = 35;  // Encode IN Digital IN (C2)  --> PB9
+    const byte motorLeftEncoderPinB = 34;  // Encode IN Digital IN (C1)  --> PB8
+    const byte enMotorLeft = 13;      // morter speed Analog(PWM) OUT  --> PB6
+    const byte in1MotorLeft = 14;    // Forward Switch  Digital OUT  --> PA15
+    const byte in2MotorLeft = 27;    // Backward Switch Digital OUT  --> PB15
 #else
-/* Define pins */
-// motor A (right)
-const byte motorRightEncoderPinA = 38;
-const byte motorRightEncoderPinB = 34;
-const byte enMotorRight = 2;
-const byte in1MotorRight = 4;   //26 C1 M1
-const byte in2MotorRight = 3;   //28 C2 M2
+    /* Define pins */
+    // motor A (right)
+    const byte motorRightEncoderPinA = 38;
+    const byte motorRightEncoderPinB = 34;
+    const byte enMotorRight = 2;
+    const byte in1MotorRight = 4;   //26 C1 M1
+    const byte in2MotorRight = 3;   //28 C2 M2
 
-// motor B (left)
-const byte motorLeftEncoderPinA = 26;
-const byte motorLeftEncoderPinB = 30;
-const byte enMotorLeft = 7;
-const byte in1MotorLeft = 6;    //30
-const byte in2MotorLeft = 5;    //32
+    // motor B (left)
+    const byte motorLeftEncoderPinA = 26;
+    const byte motorLeftEncoderPinB = 30;
+    const byte enMotorLeft = 7;
+    const byte in1MotorLeft = 6;    //30
+    const byte in2MotorLeft = 5;    //32
 #endif
 
 /* Define motors variables */
@@ -244,20 +244,20 @@ float linear_velocity_est;
 float angular_velocity_est;
 
 #if defined(CAMERA_SYNC)
-/* Camera Info flag */
-bool camera_info_f;
-double_t camera_sync_time;   // camera_sync timestamp [sec]
-float camera_cap_hz;  // camera caption rate [Hz]
+    /* Camera Info flag */
+    bool camera_info_f;
+    double_t camera_sync_time;   // camera_sync timestamp [sec]
+    float camera_cap_hz;  // camera caption rate [Hz]
 
-bool prev_ok=false;
-double_t prev_cinfo_stamp;
-uint32_t prev_cinfo_sec;
+    bool prev_ok=false;
+    double_t prev_cinfo_stamp;
+    uint32_t prev_cinfo_sec;
 
 #elif defined(CAMERA_SYNC_EX)
-/* Camera Info flag */
-bool camera_info_f;
-double_t camera_sync_time;   // camera_sync timestamp [sec]
-float camera_cap_hz;  // camera caption rate [Hz]
+    /* Camera Info flag */
+    bool camera_info_f;
+    double_t camera_sync_time;   // camera_sync timestamp [sec]
+    float camera_cap_hz;  // camera caption rate [Hz]
 #endif
 
 
@@ -289,8 +289,10 @@ ros::Time rosNow();     // add by nishi 2021.7.5
 void updateGyroCali(bool isConnected); // add by nishi 2021.11.3
 void publishImuMsg(void);   // add by nishi 2021.7.5
 #ifdef USE_MAG
-void publishMagMsg(void);   // add by nishi 2021.11.4
+    void publishMagMsg(void);   // add by nishi 2021.11.4
 #endif
+
+float q_prev[4];
 // add by nishi end
 
 /* Velocity command subscriber */
@@ -301,17 +303,17 @@ void commandVelocityCallback(const geometry_msgs::Twist& cmd_vel_msg);
 ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("/cmd_vel", commandVelocityCallback);
 
 #if defined(CAMERA_SYNC)
-/* for stereo camera */
-/* CameraInfo subscriber */
-// callback function prototype
-void cameraSyncCallback(const sensor_msgs::CameraInfo& camera_info_msg);
-ros::Subscriber<sensor_msgs::CameraInfo> camera_sync_sub("/rgb/camera_info", cameraSyncCallback);
-//ros::Subscriber<sensor_msgs::CameraInfo> camera_sync_sub("/stereo_publisher/stereo/camera_info", cameraSyncCallback);
+    /* for stereo camera */
+    /* CameraInfo subscriber */
+    // callback function prototype
+    void cameraSyncCallback(const sensor_msgs::CameraInfo& camera_info_msg);
+    ros::Subscriber<sensor_msgs::CameraInfo> camera_sync_sub("/rgb/camera_info", cameraSyncCallback);
+    //ros::Subscriber<sensor_msgs::CameraInfo> camera_sync_sub("/stereo_publisher/stereo/camera_info", cameraSyncCallback);
 
 #elif defined(CAMERA_SYNC_EX)
-/*  for OAK-D=Lite */
-void cameraSyncCallback(const sensor_msgs::Temperature& temp_msg);
-ros::Subscriber<sensor_msgs::Temperature> camera_sync_sub("/camera/sync", cameraSyncCallback);
+    /*  for OAK-D=Lite */
+    void cameraSyncCallback(const sensor_msgs::Temperature& temp_msg);
+    ros::Subscriber<sensor_msgs::Temperature> camera_sync_sub("/camera/sync", cameraSyncCallback);
 #endif
 
 
@@ -342,9 +344,9 @@ sensor_msgs::JointState joint_states;
 ros::Publisher joint_states_pub("joint_states", &joint_states);
 
 #if defined(USE_MAG)
-// Magnetic field
-sensor_msgs::MagneticField mag_msg;
-ros::Publisher mag_pub("magnetic_field", &mag_msg);
+    // Magnetic field
+    sensor_msgs::MagneticField mag_msg;
+    ros::Publisher mag_pub("magnetic_field", &mag_msg);
 #endif
 
 /*******************************************************************************
@@ -363,6 +365,8 @@ MOTOR_TIC motor_tic;
 
 int32_t dzi[3];
 int32_t dzi_sum;
+
+bool sen_init=false;
 
 // add by nishi end
 
