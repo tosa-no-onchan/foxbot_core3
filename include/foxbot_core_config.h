@@ -94,7 +94,8 @@
 #define FREQUENCY_CONTROLLER 				20 			// [ms] default 50ms
 #define FREQUENCY_CONTROLLER_HZ				50 			// 20[ms] -> 50[Hz]
 
-#define FREQUENCY_IMU_PUBLISH_HZ            200  // 5[ms] -> 200[hz]
+//#define FREQUENCY_IMU_PUBLISH_HZ            200  // 5[ms] -> 200[hz]
+#define FREQUENCY_IMU_PUBLISH_HZ            15  // 15 [hz]
 #define FREQUENCY_IMU_PUBLISH               5           // [ms] default 5ms add by nishi 2021.7.5
 
 #define FREQUENCY_IMU_DATA_HZ               100  // 90[hz]
@@ -439,5 +440,9 @@ char imu_frame_id[30];
 char mag_frame_id[30];
 
 char joint_state_header_frame_id[30];
+
+// add by nishi 2022.9.9
+bool use_tf_static=true;
+bool use_imu_pub=false;
 
 #endif // FOXBOT_CORE_CONFIG_H_

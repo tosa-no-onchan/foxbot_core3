@@ -39,8 +39,10 @@ https://gist.github.com/KobayashiRui/094ac01d9d3cd2445faa2a1ef103646f
 
 #if defined(ESP32)
 	#include <WiFi.h>
-	const char SSID[] = "WiFi ID";
-	const char PASSWORD[] = "WiFi passsword";
+	//const char SSID[] = "WiFi ID";
+	const char SSID[] = "elecom2g-DE45B0";
+	//const char PASSWORD[] = "WiFi passsword";
+	const char PASSWORD[] = "2389676465277";
 	IPAddress server(192,168,1,170);
 	const uint16_t serverPort = 11411;
 	WiFiClient client;
@@ -279,8 +281,8 @@ void setup(){
 		//nh.getHardware()->setBaud(230400);
 		//nh.getHardware()->setBaud(250000);
 		//nh.getHardware()->setBaud(500000);
-		//nh.getHardware()->setBaud(1000000);
-		nh.getHardware()->setBaud(2000000);
+		nh.getHardware()->setBaud(1000000);
+		//nh.getHardware()->setBaud(2000000);
 	#endif
 
 	#if defined(ESP32)
@@ -571,19 +573,22 @@ void loop(){
 			SERIAL_PORT.println(odom.pose.pose.position.z*10000.0, 8);
 		#endif
 
-
 		// error occured -> [ERROR] [1616575654.217167]: Message from device dropped: message larger than buffer.  by nishi
 		odom.header.stamp = nh.now();
     	odom_pub.publish(&odom);
 
-		// add by nishi for TF  2021.4.26
- 		// odometry tf
-  		updateTF(odom_tf);
-  		odom_tf.header.stamp = nh.now();
-		//odom_tf.header.stamp = odom.header.stamp;
+		// add by nishi 2022.9.9
+		// use_tf_static==true -> publist tf base_footprint 
+		if(use_tf_static==true){
+			// add by nishi for TF  2021.4.26
+			// odometry tf
+			updateTF(odom_tf);
+			odom_tf.header.stamp = nh.now();
+			//odom_tf.header.stamp = odom.header.stamp;
 
-		// ratbmap-nishi_stereo_outdoor.launch と TF がバッテイングする? 2021.9.16
-  		tf_broadcaster.sendTransform(odom_tf);
+			// ratbmap-nishi_stereo_outdoor.launch と TF がバッテイングする? 2021.9.16
+			tf_broadcaster.sendTransform(odom_tf);
+		}
 		
 		//delay(1);
 
@@ -621,7 +626,9 @@ void loop(){
 	// IMU Publish.	add by nishi 2021.7.5
 	//if(_frequency_imu.delay(millis())) {
 	if (t >= tTime[3]){
-	    //publishImuMsg();
+		if(use_imu_pub==true){
+	    	publishImuMsg();
+		}
 		#ifdef USE_MAG
 		    publishMagMsg();
 		#endif
@@ -1036,6 +1043,34 @@ void updateTFPrefix(bool isConnected)
 
       sprintf(log_msg, "Setup TF on JointState [%s]", joint_state_header_frame_id);
       nh.loginfo(log_msg); 
+
+	  // add by nishi 2022.9.9
+	  // use_tf_static==true -> publist tf base_footprint 
+      use_tf_static=true;
+	  bool yes_no=true;
+      nh.getParam("~use_tf_static", &yes_no);
+      if (yes_no == false){
+		use_tf_static=false;
+		sprintf(log_msg, "Setup use_tf_static [false]");
+		nh.loginfo(log_msg); 
+	  }
+	  else{
+		sprintf(log_msg, "Setup use_tf_static [true]");
+		nh.loginfo(log_msg); 
+	  }
+
+	  use_imu_pub=false;
+	  yes_no=false;
+      nh.getParam("~use_imu_pub", &yes_no);
+      if (yes_no == true){
+		use_imu_pub=true;
+		sprintf(log_msg, "Setup use_imu_pub [true]");
+		nh.loginfo(log_msg); 
+	  }
+	  else{
+		sprintf(log_msg, "Setup use_imu_pub [false]");
+		nh.loginfo(log_msg); 
+	  }
 
       isChecked = true;
 
