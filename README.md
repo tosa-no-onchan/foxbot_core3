@@ -61,6 +61,9 @@ Update.
     2022.3.21    
         /odom_fox tf-base_footprint の publish 時間のタイマーを milli sec から micro sec に変えて、    
         精度を上げました。    
+    2022.10.31    
+        ros2 foxy 版を branch:foxy で登録しました。    
+        
     
     
  
