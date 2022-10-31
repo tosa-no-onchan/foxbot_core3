@@ -51,11 +51,11 @@ bool Turtlebot3Sensor::init(unsigned long baud)
     battery_state_msg_.temperature     = NAN;
   #endif
 
-  battery_state_msg_.current         = NAN;
-  battery_state_msg_.charge          = NAN;
-  battery_state_msg_.capacity        = NAN;
-  battery_state_msg_.design_capacity = NAN;
-  battery_state_msg_.percentage      = NAN;
+  //battery_state_msg_.current         = NAN;
+  //battery_state_msg_.charge          = NAN;
+  //battery_state_msg_.capacity        = NAN;
+  //battery_state_msg_.design_capacity = NAN;
+  //battery_state_msg_.percentage      = NAN;
 
   get_error_code = imu_.begin(206);
 
@@ -69,8 +69,8 @@ bool Turtlebot3Sensor::init(unsigned long baud)
   return get_error_code;
 }
 
-void Turtlebot3Sensor::initIMU(void){
-  imu_.begin(206);
+uint8_t Turtlebot3Sensor::initIMU(void){
+  return imu_.begin(206);
 }
 
 #define LED_BUILTIN 17
@@ -116,7 +116,8 @@ void Turtlebot3Sensor::calibrationGyro()
 }
 
 
-sensor_msgs::Imu Turtlebot3Sensor::getIMU(void)
+//sensor_msgs::Imu Turtlebot3Sensor::getIMU(void)
+sensor_msgs__msg__Imu Turtlebot3Sensor::getIMU(void)
 {
   imu_msg_.angular_velocity.x = imu_.SEN.gyroADC[0] * GYRO_FACTOR;
   imu_msg_.angular_velocity.y = imu_.SEN.gyroADC[1] * GYRO_FACTOR;
@@ -192,7 +193,8 @@ float* Turtlebot3Sensor::getOrientation(void)
   return orientation;
 }
 
-sensor_msgs::MagneticField Turtlebot3Sensor::getMag(void)
+//sensor_msgs::MagneticField Turtlebot3Sensor::getMag(void)
+sensor_msgs__msg__MagneticField Turtlebot3Sensor::getMag(void)
 {
   mag_msg_.magnetic_field.x = imu_.SEN.magADC[0] * MAG_FACTOR;
   mag_msg_.magnetic_field.y = imu_.SEN.magADC[1] * MAG_FACTOR;
@@ -210,6 +212,7 @@ sensor_msgs::MagneticField Turtlebot3Sensor::getMag(void)
 
   return mag_msg_;
 }
+
 
 float Turtlebot3Sensor::checkVoltage(void)
 {

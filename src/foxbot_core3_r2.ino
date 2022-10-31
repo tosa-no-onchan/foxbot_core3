@@ -22,12 +22,27 @@
  * 	turtlebot3_sensor.cpp, turtlebot3_sensor.h, IMU(MPU9250+SPI) were built in.
  */
 /*
-esp32 rosserial 
-https://gist.github.com/KobayashiRui/094ac01d9d3cd2445faa2a1ef103646f
+  esp32 and Micro-ROS Arduino
+  https://github.com/micro-ROS/micro_ros_arduino
+
+  system time
+  https://qiita.com/BotanicFields/items/f1e28af5a63e4ccf7023
+
+ 1. run
+  $ sudo chmod 777 /dev/ttyUSB0 or /dev/ttyTHS1
+  $ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 [-v6] [-b 115200]
+
+ 2. check
+  $ ros2 topic list
+  $ ros2 topic hz /odom_fox
+
 */
 
 #undef ESP32
-#include "foxbot_core_config.h"
+#include "foxbot_core3_r2_config.h"
+
+#include <sys/time.h>  // for struct timeval
+
 
 #if defined(BOARD_ESP32)
 #include "soc/soc.h"
@@ -56,6 +71,674 @@ SemaphoreHandle_t xMutex = NULL;
 
 int cnt4=0;
 
+
+
+
+const void euler_to_quat(float x, float y, float z, double* q) {
+    float c1 = cos((y*3.14/180.0)/2);
+    float c2 = cos((z*3.14/180.0)/2);
+    float c3 = cos((x*3.14/180.0)/2);
+
+    float s1 = sin((y*3.14/180.0)/2);
+    float s2 = sin((z*3.14/180.0)/2);
+    float s3 = sin((x*3.14/180.0)/2);
+
+    q[0] = c1 * c2 * c3 - s1 * s2 * s3;
+    q[1] = s1 * s2 * c3 + c1 * c2 * s3;
+    q[2] = s1 * c2 * c3 + c1 * s2 * s3;
+    q[3] = c1 * s2 * c3 - s1 * c2 * s3;
+}
+
+void error_loop(){
+  while(1){
+    //digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    delay(100);
+  }
+}
+
+void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
+{  
+  RCLC_UNUSED(last_call_time);
+  RCLC_UNUSED(timer);
+}
+
+// Int32 cb
+//void subscription_callback(const void * msgin)
+//{  
+//  const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
+//  //digitalWrite(LED_PIN, (msg->data == 0) ? LOW : HIGH);  
+//}
+
+static time_t epoch_sec_off=0;	// NTP の epcoh sec からのズレ[s] 
+static time_t epoch_millis_off=0;	// NTP の epcoh milli sec からのズレ[ms]  50 day over flow
+
+void set_my_time(int timeout_ms){
+	//int timeout_ms = 1000;
+
+	struct timeval tv2={0,0};
+		//struct timeval {
+		//  time_t		tv_sec;		/* seconds */
+		//  suseconds_t	tv_usec;	/* and microseconds */
+		//};
+
+	// Synchronize time
+	if (RCL_RET_OK  != rmw_uros_sync_session(timeout_ms))
+		return;
+	
+	int64_t time_ms = rmw_uros_epoch_millis(); 
+    int64_t time_ns = rmw_uros_epoch_nanos();
+	unsigned long t = millis();
+
+	if (time_ms > 0){
+		//time_seconds = time_ms/1000;
+		//setTime(time_seconds); 
+		//sprintf(time_str, "%02d.%02d.%04d %02d:%02d:%02d.%03d", day(), month(), year(), hour(), minute(), second(), (uint) time_ms % 1000);
+
+		epoch_sec_off = time_ms/1000 - t/1000;	// millis() : プログラム実行からの経過時間(ms)をtimeに返す
+		if((time_ms % 1000) <  (t % 1000)){
+			epoch_sec_off--;
+			epoch_millis_off = (time_ms % 1000)+1000 - t % 1000;
+		}
+		else{
+			epoch_millis_off = time_ms % 1000 - t % 1000;
+		}
+
+		//HWSERIAL.print("Agent date: ");
+		//HWSERIAL.println(time_str);  
+		
+		//struct timeval tv2 = { mktime(&tm_init), 0 };
+		//tv2.tv_sec = time_ms/1000;
+		//tv2.tv_usec = time_ms % 1000;
+		//settimeofday(&tv2, NULL);
+	}
+	else{
+		//HWSERIAL.print("Session sync failed, error code: ");
+		//HWSERIAL.println((int) time_ms);  
+	}
+}
+
+void setup(){
+	#if defined(BOARD_ESP32)
+	    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
+	#endif
+
+	// Builtin LED
+	pinMode(LED_BUILTIN, OUTPUT);
+	digitalWrite(LED_BUILTIN, LOW);		// light OFF
+	//digitalWrite(LED_BUILTIN, HIGH);	// light ON
+
+	#if defined(ESP32)
+		//Serial.begin(115200);
+		//delay(10);
+		//Serial.println("start prog.");
+	#endif
+	//Serial.begin(115200);
+	//Serial.begin(1000000);
+	//1000000
+
+	#if defined(ESP32X)
+		WiFi.begin(SSID,PASSWORD);
+		Serial.print("WiFi connecting");
+
+		while (WiFi.status() != WL_CONNECTED) {
+			Serial.print(".");
+			delay(100);
+		}
+		Serial.println(" connected");
+		Serial.println("IP address: ");
+		Serial.println(WiFi.localIP());
+	#endif
+
+	// start foxbot_core
+	analogWriteResolution(12);
+	#if defined(ESP32)
+	    //Serial.println("analogWriteResolution(12) ok");
+	#endif
+
+	// set Moter control ports
+	initMoter();
+
+	#if defined(BOARD_ESP32)
+		// add by nishi for ESP32 only
+		analogWriteChannel(enMotorRight);
+		analogWriteChannel(enMotorLeft);
+	#endif
+
+	// https://micro.ros.org/docs/api/rmw/
+	// how to change Serial Speed
+	// micro_ros_arduino/src/default_transport.cpp
+	//  arduino_trans_open() の中で Srerial.begin(speed) をいじる。
+    set_microros_transports();
+
+	delay(2000);
+	// test by nishi
+	//Serial.begin(1000000);
+
+	// alloc TF Message
+	tf_message = tf2_msgs__msg__TFMessage__create();
+	geometry_msgs__msg__TransformStamped__Sequence__init(&tf_message->transforms, 1);
+
+	tf_message->transforms.data[0].header.frame_id.data = (char*)malloc(100*sizeof(char));
+	// header.frame_id
+	char string1[] = "/odom";
+	memcpy(tf_message->transforms.data[0].header.frame_id.data, string1, strlen(string1) + 1);
+	tf_message->transforms.data[0].header.frame_id.size = strlen(tf_message->transforms.data[0].header.frame_id.data);
+	tf_message->transforms.data[0].header.frame_id.capacity = 100;
+
+	// child_frame_id
+	char string2[] = "/base_footprint";
+	tf_message->transforms.data[0].child_frame_id.data =  (char*)malloc(100*sizeof(char));
+	memcpy(tf_message->transforms.data[0].child_frame_id.data, string2, strlen(string2) + 1);
+	tf_message->transforms.data[0].child_frame_id.size = strlen(tf_message->transforms.data[0].child_frame_id.data);
+	tf_message->transforms.data[0].child_frame_id.capacity = 100;
+
+
+	// Setting for IMU add by nishi 2021.7.5
+	sensors.init();
+	sen_init=true;
+
+	// Setting for SLAM and navigation (odometry, joint states, TF)
+	initOdom();
+	initJointStates();
+	prev_update_time = micros();
+    setup_end = true;
+	//Serial.println("setup end");
+	delay(100);
+
+	vSemaphoreCreateBinary( xMutex );
+	//xMutex = xSemaphoreCreateMutex();
+
+	if( xMutex != NULL ){
+		// start IMU Update Task. add by nishi 2021.8.9
+		xTaskCreatePinnedToCore(
+			update_motor,"update_motor",4096,NULL,1,&th[0],1);
+	}
+	else {
+		while(1){
+			Serial.println("rtos mutex create error, stopped");
+			delay(1000);
+		}
+	}
+
+	q_prev[0]=1.0;
+	q_prev[1]=0.0;
+	q_prev[2]=0.0;
+	q_prev[3]=0.0;
+
+	frequency_odometry_hz = (unsigned long)(1000000.0 / FREQUENCY_ODOMETRY_HZ);	// 1 cycle time[micro sec] add by nishi 2022.3.21
+	frequency_odometry_hz_ave = frequency_odometry_hz;
+	setup_end = true;
+
+  	state = WAITING_AGENT;
+
+}
+
+#ifdef TEST_NOSHI_XXX
+void loop_test(){
+	#if defined(BOARD_F407VG)
+		digitalWrite(LED_RED, HIGH);
+	#endif
+	//Serial.println("hello");
+	// test by nishi
+	uint8_t data[] = "hello4\r\n"; 
+	nh.getHardware()->write(data,8);
+	delay(100);
+	#if defined(BOARD_F407VG)
+		digitalWrite(LED_RED, LOW);
+	#endif
+	delay(100);
+}
+#endif
+
+void loop() {
+  switch (state) {
+    case WAITING_AGENT:
+      EXECUTE_EVERY_N_MS(500, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
+      break;
+    case AGENT_AVAILABLE:
+      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+      if (state == WAITING_AGENT) {
+        destroy_entities();
+      }
+	  else{
+		set_my_time();	// NTP 時刻合わせ
+
+		// set_my_time() wait time
+		tTime[7] = foxbot3::micros_() + (5 * 60 * 1000000UL );	// 5[minute]
+
+		updateVariable(true);
+		updateTFPrefix(true);
+	  }
+
+      break;
+    case AGENT_CONNECTED:
+      //EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
+	  if(RMW_RET_OK != rmw_uros_ping_agent(100, 1)){
+		state = AGENT_DISCONNECTED;
+	  }
+      if (state == AGENT_CONNECTED) {
+		// 従来の loop() 処理
+		loop_main();
+		// 受信 処理
+        //rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+
+		// syscronize NTP
+		foxbot3::usec_t t = foxbot3::micros_();
+		// set_my_time() wait time over
+		if(t >= tTime[7]){
+			set_my_time(50);
+			tTime[7] = t + (5 * 60 * 1000000UL );	// 5[minute]
+		}
+		
+      }
+      break;
+    case AGENT_DISCONNECTED:
+	  updateVariable(false);
+	  updateTFPrefix(false);
+	  // stop motor
+	  linear_velocity_ref=0.0;
+	  angular_velocity_ref=0.0;
+
+      destroy_entities();
+      state = WAITING_AGENT;
+      break;
+    default:
+      break;
+  }
+
+  if (state == AGENT_CONNECTED) {
+    //digitalWrite(LED_PIN, 1);
+  } 
+  else {
+    //digitalWrite(LED_PIN, 0);
+  }
+}
+
+void loop_main(){
+	//bool imu_exec=false;
+	CB cb;
+	double dlt[3];
+
+	// add by nishi
+	//updateVariable(true);
+	//updateTFPrefix(true);
+
+	struct timespec tv;
+	// こちらは、データが入ってこない。
+	//clock_gettime(0, &tv);
+	// esp32 の system mills + NTP epoch millis off -> Now mills
+	unsigned long u_ms = millis();
+	tv.tv_sec = u_ms/1000 + epoch_sec_off;		// epoch sec
+	unsigned long ms = u_ms%1000 + epoch_millis_off;
+	if(ms > 1000 )
+	{
+		tv.tv_sec++;
+		ms -=1000;
+	}
+	tv.tv_nsec = ms*1000*1000;	// epoch nano sec
+
+
+	// Start Gyro Calibration after ROS connection  add by nishi 2021.11.3
+	//updateGyroCali(nh.connected());
+
+	//sensors.updateIMU();
+
+	//uint32_t t = millis();
+	//unsigned long t = micros();
+	foxbot3::usec_t t = foxbot3::micros_();
+
+	// update odometry
+	if (t >= tTime[2]){
+		//float dt, dx, dy, dz;
+		double dt, dx, dy, dz;
+		//float qw, qx, qy, qz;
+		//double qw, qx, qy, qz;
+		double q[4];
+		double q_tmp[4];
+		double roll, pitch, yaw;
+
+		//dt = (float)(millis() - odom_prev_time) * 0.001f;
+		//dt = (double)(micros() - odom_prev_time) * 0.000001;	// dt[Sec]
+		dt = (double)(t - odom_prev_time) * 0.000001;	// dt[Sec]
+		//odom_prev_time = millis();
+		//odom_prev_time = micros();
+		odom_prev_time = t;
+
+		// compute linear and angular estimated velocity
+		linear_velocity_est = WHEEL_RADIUS * (motor_right_rate_est + motor_left_rate_est) / 2.0f;
+		angular_velocity_est = (WHEEL_RADIUS / BASE_LENGTH)
+							 * (motor_right_rate_est - motor_left_rate_est);
+
+		// compute translation and rotation
+		yaw_est += angular_velocity_est * dt;
+		dx = cos(yaw_est) * linear_velocity_est * dt;	// 基本座標系
+		dy = sin(yaw_est) * linear_velocity_est * dt;	// 基本座標系
+		dz = 0.0;
+
+		// DEBUG
+		//debug_left.y = yaw_est * 57.2958;
+		//debug_left.z = angular_velocity_est * dt;
+		//debug_publisher1.publish(&debug_left);
+
+		#ifndef ODOM_USE_IMU
+			// compute quaternion
+			q[0] = cos(abs(yaw_est) / 2.0f);		// qw
+			q[1] = 0.0f;							// qx
+			q[2] = 0.0f;							// qy
+			q[3] = sign(yaw_est) * sin(abs(yaw_est) / 2.0f);	// gz
+		#else
+			bool ok =true;
+			if(pdTRUE == xSemaphoreTake(xMutex, 10UL)){
+				ok=false;
+			}
+			// get IMU data
+			imu_msg = sensors.getIMU();
+			if(ok){
+				xSemaphoreGive(xMutex);
+			}
+			q[0] = imu_msg.orientation.w;
+			q[1] = imu_msg.orientation.x;
+			//q[2] = imu_msg.orientation.y - 0.013;	// ロボットの前傾を調整。 adjust verical angle IMU
+			q[2] = imu_msg.orientation.y;	// ロボットの前傾 そのまま。 2022.10.28
+			q[3] = imu_msg.orientation.z;
+
+			//SERIAL_PORT.print(F("q[0]:"));
+			//SERIAL_PORT.print(q[0], 3);
+			//SERIAL_PORT.print(F(" q[1]:"));
+			//SERIAL_PORT.print(q[1], 3);
+			//SERIAL_PORT.print(F(" g[2]:"));
+			//SERIAL_PORT.print(q[2], 3);
+			//SERIAL_PORT.print(F(" q[3]:"));
+			//SERIAL_PORT.println(q[3], 3);
+
+
+			// 1つ前のとの 4:6 のクォータニオンをつかいます。
+			//q_tmp[1] = (float)(q[1]*0.3 + q_prev[1]*0.7);
+			//q_tmp[2] = (float)(q[2]*0.3 + q_prev[2]*0.7);
+			//q_tmp[3] = (float)(q[3]*0.3 + q_prev[3]*0.7);
+
+			//q0 = sqrt(1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3)));    //  -- W
+			//q_tmp[0] = sqrt(1.0 - ((q_tmp[1] * q_tmp[1]) + (q_tmp[2] * q_tmp[2]) + (q_tmp[3] * q_tmp[3])));
+
+			q[0]=1.0 - ((q[1] * q[1]) + (q[2] * q[2]) + (q[3] * q[3]));
+			if(q[0] >= 0.0) q[0] = sqrt(q[0]);
+			else q[0] = sqrt(q[0] * -1.0) * -1.0;
+
+
+			//sensors.imu_.compCB(q_tmp,&cb);
+			sensors.imu_.compCBd(q,&cb);
+
+			//q_prev[0]=q[0];
+			//q_prev[1]=q[1];
+			//q_prev[2]=q[2];
+			//q_prev[3]=q[3];
+			double dx1,dy1,dz1;
+
+			#if defined(TEST_10_x3)
+			cnt4++;
+			if (cnt4==0)
+				linear_velocity_est=0.0;
+			else if(cnt4==1)
+				linear_velocity_est=0.005;
+			else if(cnt4==2)
+				linear_velocity_est=0.002;
+			else if(cnt4==3)
+				linear_velocity_est=-0.002;
+			else if(cnt4==4)
+				linear_velocity_est=0.0;
+			else{
+				linear_velocity_est=-0.005;
+				cnt4=0;
+			}
+			#endif
+
+			dx1 = linear_velocity_est * dt;
+			dy1 = 0.0;
+			dz1=0.0;
+
+			dlt[0]=cb.dt[0][0]*dx1+cb.dt[0][1]*dy1+cb.dt[0][2]*dz1;
+			dlt[1]=cb.dt[1][0]*dx1+cb.dt[1][1]*dy1+cb.dt[1][2]*dz1;
+			dlt[2]=cb.dt[2][0]*dx1+cb.dt[2][1]*dy1+cb.dt[2][2]*dz1;
+
+
+			dx = dlt[0];
+			dy = dlt[1];
+			dz = dlt[2];
+
+			//if (fabs(dx) < 0.00025){
+			//	dz=0.0;
+			//}
+
+			//#define TEST_10_x
+			#if defined(TEST_10_x)
+			SERIAL_PORT.print(F("dx:"));
+			SERIAL_PORT.print(dx, 6);
+			SERIAL_PORT.print(F(" dy:"));
+			SERIAL_PORT.print(dy, 6);
+			SERIAL_PORT.print(F(" dz:"));
+			SERIAL_PORT.println(dz, 6);
+			#endif
+
+		#endif
+
+		// feed odom message
+		//odom.header.stamp = nh.now();
+		odom.header.stamp.sec = tv.tv_sec;
+		odom.header.stamp.nanosec = tv.tv_nsec;
+		updateOdometry();
+		//odom.header.frame_id = "odom";
+		//odom.child_frame_id = "base_footprint";
+		odom.pose.pose.position.x += dx;
+		odom.pose.pose.position.y += dy;
+		//odom.pose.pose.position.z = 0.0;
+		odom.pose.pose.position.z += dz;
+		odom.pose.pose.orientation.w = q[0];
+		odom.pose.pose.orientation.x = q[1];
+		odom.pose.pose.orientation.y = q[2];
+		odom.pose.pose.orientation.z = q[3];
+		// Velocity expressed in base_link frame
+		odom.twist.twist.linear.x = linear_velocity_est;
+		odom.twist.twist.linear.y = 0.0f;
+		odom.twist.twist.angular.z = angular_velocity_est;
+
+		//#define TEST_10_x1
+		#if defined(TEST_10_x1)
+			SERIAL_PORT.print(F("x:"));
+			SERIAL_PORT.print(odom.pose.pose.position.x*10000.0, 8);
+			SERIAL_PORT.print(F(" y"));
+			SERIAL_PORT.print(odom.pose.pose.position.y*10000.0, 8);
+			SERIAL_PORT.print(F(" z:"));
+			SERIAL_PORT.println(odom.pose.pose.position.z*10000.0, 8);
+		#endif
+
+		// error occured -> [ERROR] [1616575654.217167]: Message from device dropped: message larger than buffer.  by nishi
+		//odom.header.stamp = nh.now();
+    	//odom_pub.publish(&odom);
+		RCSOFTCHECK(rcl_publish(&odom_publisher, &odom, NULL));
+
+		// add by nishi 2022.9.9
+		// use_tf_static==true -> publist tf base_footprint 
+		if(use_tf_static==true){
+			// add by nishi for TF  2021.4.26
+			// odometry tf
+			//updateTF(odom_tf);
+			updateTF(tf_message->transforms.data[0]);
+			//odom_tf.header.stamp = nh.now();
+			//odom_tf.header.stamp = odom.header.stamp;
+
+			// set time stamp
+		    tf_message->transforms.data[0].header.stamp.nanosec = tv.tv_nsec;
+			//tf_message->transforms.data[0].header.stamp.nanosec = time_ns;
+		    tf_message->transforms.data[0].header.stamp.sec = tv.tv_sec;
+			//tf_message->transforms.data[0].header.stamp.sec = time_seconds;
+
+			// ratbmap-nishi_stereo_outdoor.launch と TF がバッテイングする? 2021.9.16
+			RCSOFTCHECK(rcl_publish(&tf_publisher, tf_message, NULL));
+		}
+		
+		//delay(1);
+
+		// add by nishi for joint states pub. but not yet correct work
+		int32_t left_tick=motor_tic.left;
+		int32_t right_tick=motor_tic.right;
+		//motor_tic.left=0;
+		//motor_tic.right=0;
+		updateMotorInfo(left_tick,right_tick);
+		// joint states
+		updateJointStates();
+		//joint_states.header.stamp = nh.now();
+		//joint_states.header.stamp = odom.header.stamp;
+
+		//joint_states_pub.publish(&joint_states);
+
+		//Serial.print("motor_tic.left=");
+		//Serial.print(motor_tic.left, DEC);
+		//Serial.println("");
+		//Serial.print("motor_tic.right=");
+		//Serial.print(motor_tic.right, DEC);
+		//Serial.println("");
+
+
+		tTime[2] = t + frequency_odometry_hz;	// set 1-cycle-time [ms] to odom Timer.
+
+		t = foxbot3::micros_();
+    }
+
+	// Update the IMU unit.	add by nishi 2021.7.5
+	//if(imu_exec == false){
+	//	sensors.updateIMU();
+	//	imu_exec=true;
+	//}
+
+	// IMU Publish.	add by nishi 2021.7.5
+	//if(_frequency_imu.delay(millis())) {
+	if (t >= tTime[3]){
+		if(use_imu_pub==true){
+	    	publishImuMsg();
+		}
+		#ifdef USE_MAG
+		    publishMagMsg();
+		#endif
+	    tTime[3] = t + (1000000UL / FREQUENCY_IMU_PUBLISH_HZ);
+		//t = millis();		// comment in by nishi 2022.3.18
+	}
+
+	//if(_frequency_ver_info.delay(millis())) {
+	//	publishVersionInfoMsg();
+	//}
+
+	// update subscribers values
+	if (t >= tTime[5]){
+		// Subscribe topic の 受信時に必要
+		//RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
+		RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(2)));
+
+	    //tTime[5] = t + 2000;	// wait 2[ms]
+	    tTime[5] = t + 20000;	// wait 20[ms]
+	}
+
+}
+
+
+//twist message cb
+void commandVelocityCallback(const void *cmd_vel_msg){
+	const geometry_msgs__msg__Twist * msg = (const geometry_msgs__msg__Twist *)cmd_vel_msg;
+	// if velocity in x direction is 0 turn off LED, if 1 turn on LED
+	//digitalWrite(LED_PIN, (msg->linear.x == 0) ? LOW : HIGH);
+
+	linear_velocity_ref  = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->linear.x;
+	angular_velocity_ref = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->angular.z;
+}
+
+bool create_entities()
+{
+	allocator = rcl_get_default_allocator();
+
+	//create init_options
+	RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+
+	#ifdef USE_ORG1
+		// create node
+		RCCHECK(rclc_node_init_default(&node, "micro_ros_arduino_node", "", &support));
+	#else
+		// create node
+		// reffer from  https://qiita.com/ousagi_sama/items/a814b3db925b7ce2aeea
+		// ノードの生成 (foxy版)
+		rcl_node_options_t node_ops = rcl_node_get_default_options();
+		node_ops.domain_id = (size_t)(30);		// ドメインIDの設定
+		//rclc_node_init_with_options(&node, "node_name", "namespace", &support, &node_ops);
+		rclc_node_init_with_options(&node, "micro_ros_arduino_node", "", &support, &node_ops);
+
+		// ノードの生成 (galactic版以降)
+		//rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
+		//RCSOFTCHECK(rcl_init_options_init(&init_options, allocator));
+		//RCSOFTCHECK(rcl_init_options_set_domain_id(&init_options, 30));		// ドメインIDの設定
+		//rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator); // 前のrclc_support_initは削除する
+		//rclc_node_init_default(&node, "node_name", "namespace", &support);
+
+	#endif
+
+	// craete publisher for "odom_fox"
+	RCCHECK(rclc_publisher_init_default(
+		&odom_publisher, &node,
+		//odom_type_support,
+		ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry), 
+		odom_topic_name));	
+
+	// create publisher for "tf"
+	RCCHECK(rclc_publisher_init_default(
+		&tf_publisher,
+		&node,
+		ROSIDL_GET_MSG_TYPE_SUPPORT(tf2_msgs, msg, TFMessage),
+		tf_topic_name));
+
+	// create subscriber Int32
+	//RCCHECK(rclc_subscription_init_default(
+	//  &subscriber,
+	//  &node,
+	//  ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+	//  "micro_ros_arduino_subscriber"));
+
+	// create subscriber for Twist "cmd_vel"
+	RCCHECK(rclc_subscription_init_default(
+		&cmd_vel_subscriber,
+		&node,
+		ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+		"cmd_vel"));
+
+	// create timer,
+	const unsigned int timer_timeout = 1000;
+	RCCHECK(rclc_timer_init_default(
+	&timer,
+	&support,
+	RCL_MS_TO_NS(timer_timeout),
+	timer_callback));
+
+	// create executor
+	//  for publisher
+	RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
+	//  for cmd_vel subscriber
+	RCCHECK(rclc_executor_add_subscription(&executor, &cmd_vel_subscriber, &cmd_vel_msg0, &commandVelocityCallback, ON_NEW_DATA));
+
+	return true;
+}
+
+void destroy_entities()
+{
+  rcl_ret_t rc;
+  rmw_context_t * rmw_context = rcl_context_get_rmw_context(&support.context);
+  (void) rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
+
+  rc=rcl_publisher_fini(&odom_publisher, &node);
+  rc=rcl_publisher_fini(&tf_publisher, &node);
+  rc=rcl_subscription_fini(&cmd_vel_subscriber, &node);
+
+  rc=rcl_timer_fini(&timer);
+  rclc_executor_fini(&executor);
+  rc=rcl_node_fini(&node);
+  rclc_support_fini(&support);
+}
+
 void update_motor(void *pvParameters){
 	xSemaphoreGive(xMutex);
 
@@ -64,7 +747,8 @@ void update_motor(void *pvParameters){
 
 	while(1){
 		//uint32_t t = millis();
-		unsigned long t = micros();
+		//unsigned long t = micros();
+		foxbot3::usec_t t = foxbot3::micros_();	// update by nishi 2022.10.28
 
 		// rate computation
 		//if(_frequency_rate.delay(millis())) {
@@ -130,7 +814,7 @@ void update_motor(void *pvParameters){
 			//digitalWrite(RT_PIN0, LOW);
 
 			tTime[0] = t + (1000000UL / FREQUENCY_RATE_HZ);
-			t = micros();
+			t = foxbot3::micros_();
 		}
 
 		// rate controler
@@ -172,7 +856,7 @@ void update_motor(void *pvParameters){
 			//digitalWrite(RT_PIN1, LOW);
 
 			tTime[1] = t + (1000000UL / FREQUENCY_CONTROLLER_HZ);
-			t = micros();		// add by nishi 2022.3.18
+			t = foxbot3::micros_();		// add by nishi 2022.3.18
 		}
 
 		if (t >= tTime[4]){
@@ -226,547 +910,6 @@ void update_motor(void *pvParameters){
 	}
 }
 
-void setup(){
-	#if defined(BOARD_ESP32)
-	    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
-	#endif
-
-	// Builtin LED
-	pinMode(LED_BUILTIN, OUTPUT);
-	digitalWrite(LED_BUILTIN, LOW);		// light OFF
-	//digitalWrite(LED_BUILTIN, HIGH);	// light ON
-
-	#if defined(ESP32)
-		Serial.begin(115200);
-		delay(10);
-		Serial.println("start prog.");
-	#endif
-
-	#if defined(ESP32)
-		WiFi.begin(SSID,PASSWORD);
-		Serial.print("WiFi connecting");
-
-		while (WiFi.status() != WL_CONNECTED) {
-			Serial.print(".");
-			delay(100);
-		}
-		Serial.println(" connected");
-		Serial.println("IP address: ");
-		Serial.println(WiFi.localIP());
-	#endif
-
-	// start foxbot_core
-	analogWriteResolution(12);
-	#if defined(ESP32)
-	    Serial.println("analogWriteResolution(12) ok");
-	#endif
-
-	// set Moter control ports
-	initMoter();
-
-	#if defined(BOARD_ESP32)
-		// add by nishi for ESP32 only
-		analogWriteChannel(enMotorRight);
-		analogWriteChannel(enMotorLeft);
-	#endif
-
-	#if defined(ESP32)
-		Serial.println("nh.getHardware()->setConnection(() call");
-		delay(100);
-		// set Server IP & port  ESP32 Wi-FI add by nishi 2021.5.6
-		nh.getHardware()->setConnection(server, serverPort);
-	#else
-		// set serial spped
-		//nh.getHardware()->setBaud(115200);
-		//nh.getHardware()->setBaud(230400);
-		//nh.getHardware()->setBaud(250000);
-		//nh.getHardware()->setBaud(500000);
-		nh.getHardware()->setBaud(1000000);
-		//nh.getHardware()->setBaud(2000000);
-	#endif
-
-	#if defined(ESP32)
-		Serial.println("nh.initNode() call");
-	#endif
-	delay(100);
-	// ROS node initialization
-	nh.initNode();
-
-
-	#if defined(ESP32)
-		IPAddress ipa= nh.getHardware()->getLocalIP();
-		Serial.print("ip:");
-		Serial.println(ipa.toString());
-	#endif
-
-	// Subscriber
-	nh.subscribe(cmd_vel_sub);
-
-	#if defined(CAMERA_SYNC) or defined(CAMERA_SYNC_EX)
-		delay(100);
-		camera_info_f = false;
-		nh.subscribe(camera_sync_sub);
-		delay(100);
-	#endif
-
-	// Publisher
-    //nh.advertise(version_info_pub);
-	nh.advertise(imu_pub);		// add by nishi 2021.7.5
-	nh.advertise(odom_pub);
-	// add by nishi  2021.4.26
-	nh.advertise(joint_states_pub);
-
-	#ifdef USE_MAG
-		nh.advertise(mag_pub);
-	#endif
-
-	// DEBUG
-	nh.advertise(debug_publisher1);
-	nh.advertise(debug_publisher2);
-
-	// call ros::Publisher() for "/tf"
-	tf_broadcaster.init(nh);
-
-	// RT
-	//pinMode(RT_PIN0, OUTPUT);
-	//pinMode(RT_PIN1, OUTPUT);
-
-	// Setting for IMU add by nishi 2021.7.5
-	sensors.init();
-	sen_init=true;
-
-	// Setting for SLAM and navigation (odometry, joint states, TF)
-	initOdom();
-	initJointStates();
-	prev_update_time = micros();
-    setup_end = true;
-	//Serial.println("setup end");
-	delay(100);
-
-	// define tasks frequency
-	//_frequency_rate.start((unsigned long) millis());
-	//_frequency_controller.start((unsigned long) millis());
-	//_frequency_odometry.start((unsigned long) millis());
-	//_frequency_rospinonce.start((unsigned long) millis());
-	//_frequency_imu.start((unsigned long) millis());		// add by nishi 2021.7.5
-
-
-	vSemaphoreCreateBinary( xMutex );
-	//xMutex = xSemaphoreCreateMutex();
-
-	if( xMutex != NULL ){
-		// start IMU Update Task. add by nishi 2021.8.9
-		xTaskCreatePinnedToCore(
-			update_motor,"update_motor",4096,NULL,1,&th[0],1);
-	}
-	else {
-		while(1){
-			Serial.println("rtos mutex create error, stopped");
-			delay(1000);
-		}
-	}
-
-	q_prev[0]=1.0;
-	q_prev[1]=0.0;
-	q_prev[2]=0.0;
-	q_prev[3]=0.0;
-
-	frequency_odometry_hz = (unsigned long)(1000000.0 / FREQUENCY_ODOMETRY_HZ);	// 1 cycle time[micro sec] add by nishi 2022.3.21
-	frequency_odometry_hz_ave = frequency_odometry_hz;
-	setup_end = true;
-}
-
-#ifdef TEST_NOSHI_XXX
-void loop_test(){
-	#if defined(BOARD_F407VG)
-		digitalWrite(LED_RED, HIGH);
-	#endif
-	//Serial.println("hello");
-	// test by nishi
-	uint8_t data[] = "hello4\r\n"; 
-	nh.getHardware()->write(data,8);
-	delay(100);
-	#if defined(BOARD_F407VG)
-		digitalWrite(LED_RED, LOW);
-	#endif
-	delay(100);
-}
-#endif
-
-void loop(){
-	//bool imu_exec=false;
-	CB cb;
-	double dlt[3];
-
-	// add by nishi
-	updateVariable(nh.connected());
-	updateTFPrefix(nh.connected());
-
-	// Start Gyro Calibration after ROS connection  add by nishi 2021.11.3
-	//updateGyroCali(nh.connected());
-
-	//sensors.updateIMU();
-
-	//uint32_t t = millis();
-	unsigned long t = micros();
-
-	// update odometry
-	if (t >= tTime[2]){
-		//float dt, dx, dy, dz;
-		double dt, dx, dy, dz;
-		//float qw, qx, qy, qz;
-		//double qw, qx, qy, qz;
-		double q[4];
-		double q_tmp[4];
-		double roll, pitch, yaw;
-
-		//dt = (float)(millis() - odom_prev_time) * 0.001f;
-		dt = (double)(micros() - odom_prev_time) * 0.000001;	// dt[Sec]
-		//odom_prev_time = millis();
-		odom_prev_time = micros();
-
-		// compute linear and angular estimated velocity
-		linear_velocity_est = WHEEL_RADIUS * (motor_right_rate_est + motor_left_rate_est) / 2.0f;
-		angular_velocity_est = (WHEEL_RADIUS / BASE_LENGTH)
-							 * (motor_right_rate_est - motor_left_rate_est);
-
-		// compute translation and rotation
-		yaw_est += angular_velocity_est * dt;
-		dx = cos(yaw_est) * linear_velocity_est * dt;	// 基本座標系
-		dy = sin(yaw_est) * linear_velocity_est * dt;	// 基本座標系
-		dz = 0.0;
-
-		// DEBUG
-		//debug_left.y = yaw_est * 57.2958;
-		//debug_left.z = angular_velocity_est * dt;
-		//debug_publisher1.publish(&debug_left);
-
-		#ifndef ODOM_USE_IMU
-			// compute quaternion
-			q[0] = cos(abs(yaw_est) / 2.0f);		// qw
-			q[1] = 0.0f;							// qx
-			q[2] = 0.0f;							// qy
-			q[3] = sign(yaw_est) * sin(abs(yaw_est) / 2.0f);	// gz
-		#else
-			bool ok =true;
-			if(pdTRUE == xSemaphoreTake(xMutex, 10UL)){
-				ok=false;
-			}
-			// get IMU data
-			imu_msg = sensors.getIMU();
-			if(ok){
-				xSemaphoreGive(xMutex);
-			}
-			q[0] = imu_msg.orientation.w;
-			q[1] = imu_msg.orientation.x;
-			q[2] = imu_msg.orientation.y - 0.013;	// ロボットの前傾を調整。
-			q[3] = imu_msg.orientation.z;
-
-			//SERIAL_PORT.print(F("q[0]:"));
-			//SERIAL_PORT.print(q[0], 3);
-			//SERIAL_PORT.print(F(" q[1]:"));
-			//SERIAL_PORT.print(q[1], 3);
-			//SERIAL_PORT.print(F(" g[2]:"));
-			//SERIAL_PORT.print(q[2], 3);
-			//SERIAL_PORT.print(F(" q[3]:"));
-			//SERIAL_PORT.println(q[3], 3);
-
-
-			// 1つ前のとの 4:6 のクォータニオンをつかいます。
-			//q_tmp[1] = (float)(q[1]*0.3 + q_prev[1]*0.7);
-			//q_tmp[2] = (float)(q[2]*0.3 + q_prev[2]*0.7);
-			//q_tmp[3] = (float)(q[3]*0.3 + q_prev[3]*0.7);
-
-			//q0 = sqrt(1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3)));    //  -- W
-			//q_tmp[0] = sqrt(1.0 - ((q_tmp[1] * q_tmp[1]) + (q_tmp[2] * q_tmp[2]) + (q_tmp[3] * q_tmp[3])));
-
-			q[0]=1.0 - ((q[1] * q[1]) + (q[2] * q[2]) + (q[3] * q[3]));
-			if(q[0] >= 0.0) q[0] = sqrt(q[0]);
-			else q[0] = sqrt(q[0] * -1.0) * -1.0;
-
-
-			//sensors.imu_.compCB(q_tmp,&cb);
-			sensors.imu_.compCBd(q,&cb);
-
-			//q_prev[0]=q[0];
-			//q_prev[1]=q[1];
-			//q_prev[2]=q[2];
-			//q_prev[3]=q[3];
-			double dx1,dy1,dz1;
-
-			#if defined(TEST_10_x3)
-			cnt4++;
-			if (cnt4==0)
-				linear_velocity_est=0.0;
-			else if(cnt4==1)
-				linear_velocity_est=0.005;
-			else if(cnt4==2)
-				linear_velocity_est=0.002;
-			else if(cnt4==3)
-				linear_velocity_est=-0.002;
-			else if(cnt4==4)
-				linear_velocity_est=0.0;
-			else{
-				linear_velocity_est=-0.005;
-				cnt4=0;
-			}
-			#endif
-
-
-			dx1 = linear_velocity_est * dt;
-			dy1 = 0.0;
-			dz1=0.0;
-
-			dlt[0]=cb.dt[0][0]*dx1+cb.dt[0][1]*dy1+cb.dt[0][2]*dz1;
-			dlt[1]=cb.dt[1][0]*dx1+cb.dt[1][1]*dy1+cb.dt[1][2]*dz1;
-			dlt[2]=cb.dt[2][0]*dx1+cb.dt[2][1]*dy1+cb.dt[2][2]*dz1;
-
-
-			dx = dlt[0];
-			dy = dlt[1];
-			dz = dlt[2];
-
-			//if (fabs(dx) < 0.00025){
-			//	dz=0.0;
-			//}
-
-
-			//#define TEST_10_x
-			#if defined(TEST_10_x)
-			SERIAL_PORT.print(F("dx:"));
-			SERIAL_PORT.print(dx, 6);
-			SERIAL_PORT.print(F(" dy:"));
-			SERIAL_PORT.print(dy, 6);
-			SERIAL_PORT.print(F(" dz:"));
-			SERIAL_PORT.println(dz, 6);
-			#endif
-
-
-		#endif
-
-		// feed odom message
-		//odom.header.stamp = nh.now();
-		updateOdometry();
-		//odom.header.frame_id = "odom";
-		//odom.child_frame_id = "base_footprint";
-		odom.pose.pose.position.x += dx;
-		odom.pose.pose.position.y += dy;
-		//odom.pose.pose.position.z = 0.0;
-		odom.pose.pose.position.z += dz;
-		odom.pose.pose.orientation.w = q[0];
-		odom.pose.pose.orientation.x = q[1];
-		odom.pose.pose.orientation.y = q[2];
-		odom.pose.pose.orientation.z = q[3];
-		// Velocity expressed in base_link frame
-		odom.twist.twist.linear.x = linear_velocity_est;
-		odom.twist.twist.linear.y = 0.0f;
-		odom.twist.twist.angular.z = angular_velocity_est;
-
-
-		//#define TEST_10_x1
-		#if defined(TEST_10_x1)
-			SERIAL_PORT.print(F("x:"));
-			SERIAL_PORT.print(odom.pose.pose.position.x*10000.0, 8);
-			SERIAL_PORT.print(F(" y"));
-			SERIAL_PORT.print(odom.pose.pose.position.y*10000.0, 8);
-			SERIAL_PORT.print(F(" z:"));
-			SERIAL_PORT.println(odom.pose.pose.position.z*10000.0, 8);
-		#endif
-
-		// error occured -> [ERROR] [1616575654.217167]: Message from device dropped: message larger than buffer.  by nishi
-		odom.header.stamp = nh.now();
-    	odom_pub.publish(&odom);
-
-		// add by nishi 2022.9.9
-		// use_tf_static==true -> publist tf base_footprint 
-		if(use_tf_static==true){
-			// add by nishi for TF  2021.4.26
-			// odometry tf
-			updateTF(odom_tf);
-			odom_tf.header.stamp = nh.now();
-			//odom_tf.header.stamp = odom.header.stamp;
-
-			// ratbmap-nishi_stereo_outdoor.launch と TF がバッテイングする? 2021.9.16
-			tf_broadcaster.sendTransform(odom_tf);
-		}
-		
-		//delay(1);
-
-		// add by nishi for joint states pub. but not yet correct work
-		int32_t left_tick=motor_tic.left;
-		int32_t right_tick=motor_tic.right;
-		//motor_tic.left=0;
-		//motor_tic.right=0;
-		updateMotorInfo(left_tick,right_tick);
-		// joint states
-		updateJointStates();
-		joint_states.header.stamp = nh.now();
-		//joint_states.header.stamp = odom.header.stamp;
-
-		joint_states_pub.publish(&joint_states);
-
-		//Serial.print("motor_tic.left=");
-		//Serial.print(motor_tic.left, DEC);
-		//Serial.println("");
-		//Serial.print("motor_tic.right=");
-		//Serial.print(motor_tic.right, DEC);
-		//Serial.println("");
-
-		tTime[2] = t + frequency_odometry_hz;	// set 1-cycle-time [ms] to odom Timer.
-
-		t = micros();
-    }
-
-	// Update the IMU unit.	add by nishi 2021.7.5
-	//if(imu_exec == false){
-	//	sensors.updateIMU();
-	//	imu_exec=true;
-	//}
-
-	// IMU Publish.	add by nishi 2021.7.5
-	//if(_frequency_imu.delay(millis())) {
-	if (t >= tTime[3]){
-		if(use_imu_pub==true){
-	    	publishImuMsg();
-		}
-		#ifdef USE_MAG
-		    publishMagMsg();
-		#endif
-	    tTime[3] = t + (1000000UL / FREQUENCY_IMU_PUBLISH_HZ);
-		//t = millis();		// comment in by nishi 2022.3.18
-	}
-
-	//if(_frequency_ver_info.delay(millis())) {
-	//	publishVersionInfoMsg();
-	//}
-
-	// update subscribers values
-	if (t >= tTime[5]){
-		nh.spinOnce();
-		// test by nishi
-		//uint8_t data[] = "hello4\r\n"; 
-		//nh.getHardware()->write(data,8);
-	    tTime[5] = t + 2000;	// wait 2[ms]
-	}
-
-	#if defined(CAMERA_SYNC) or defined(CAMERA_SYNC_EX)
-		// got camere info topic. 
-		if (camera_info_f == true){
-			// 自分(odom publish timestamp) の 時刻は、
-			double_t odom_time = odom.header.stamp.toSec();
-			// 自分 と camera info(publish timestamp) のズレは?
-			double_t pub_off = odom_time - camera_sync_time;
-
-			// 自分 が、遅れている。
-			//if(pub_off > 0.0){
-			// 時間のズレは、1 cycle 以内です?
-			if(pub_off > 0.0 && pub_off <= ((double_t)frequency_odometry_hz / 1000000.0)){
-				// 自分 は、 camera info より 1 cycle より遅れています。
-				//if(pub_off > ((double_t)frequency_odometry_hz / 1000000.0)){
-					// 5[milli sec] 早くします。
-					//tTime[2] = t + frequency_odometry_hz - 5000;
-				//	tTime[2] -= 5000;
-				//}
-				// 自分 は、 camera info より 10[ms] より遅れています。
-				if(pub_off > 0.010){
-					// 1[milli sec] 早くします。
-					//tTime[2] = t + frequency_odometry_hz - 1000;
-					tTime[2] -= 1000;
-				}
-				// 自分 は、camera info より 1[ms] より遅れています。
-				else if(pub_off > 0.001){
-					// 100[micro sec] 早くします。
-					//tTime[2] = t + frequency_odometry_hz - 100;
-					tTime[2] -= 100;
-				}
-				// 自分 は、camera info より 0.1[ms] より遅れています。
-				else if(pub_off > 0.0001){
-					// 10[micro sec] 早くします。
-					//tTime[2] = t + frequency_odometry_hz - 10;
-					tTime[2] -= 10;
-				}
-			}
-			// 自分 は、進んでいます。
-			//else if(pub_off < 0.0){
-			// 時間のズレは、1 cycle 以内です?
-			else if(pub_off < 0.0 && pub_off >= ((double_t)frequency_odometry_hz / -1000000.0)){
-				// 自分 は、camera info より 1 cycle より進んでいます。
-				//if(pub_off < ((double_t)frequency_odometry_hz / -1000000.0)){
-					// 5[milli sec] 遅くします。
-					//tTime[2] = t + frequency_odometry_hz + 5000;
-				//	tTime[2] += 5000;
-				//}
-				// 自分 は、camera info より 10[ms] より進んでいます。
-				if(pub_off < -0.010){
-					// 1[milli sec] 遅くします。
-					//tTime[2] = t + frequency_odometry_hz + 1000;
-					tTime[2] += 1000;
-				}
-				// 自分(odom )は、camera info より 1[ms] より進んでいます。
-				else if(pub_off <  -0.001){
-					// 100[micro sec] 遅くします。
-					//tTime[2] = t + frequency_odometry_hz + 100;
-					tTime[2] += 100;
-				}
-				// 自分(odom )は、camera info より 0.1[ms] より進んでいます。
-				else if(pub_off <  -0.0001){
-					// 10[micro sec] 遅くします。
-					//tTime[2] = t + frequency_odometry_hz + 10;
-					tTime[2] += 10;
-				}
-			}
-			camera_info_f=false;
-		}
-	#endif
-}
-
-void commandVelocityCallback(const geometry_msgs::Twist& cmd_vel_msg) {
-	linear_velocity_ref  = cmd_vel_msg.linear.x;
-	angular_velocity_ref = cmd_vel_msg.angular.z;
-	#if defined(BOARD_F407VG)
-		digitalWrite(LED_ORANGE, HIGH-digitalRead(LED_ORANGE));   // blink the led
-	#elif defined(BOARD_BLACKPILL) or defined(ESP32)
-		digitalWrite(LED_BUILTIN, HIGH-digitalRead(LED_BUILTIN));   // blink the blue
-	#endif
-}
-
-#if defined(CAMERA_SYNC)
-void cameraSyncCallback(const sensor_msgs::CameraInfo& camera_info_msg){
-	if((camera_info_msg.header.seq % 5) == 0){
-		camera_info_f = true;
-		//digitalWrite(LED_BUILTIN, HIGH-digitalRead(LED_BUILTIN));   // blink the blue
-		camera_sync_time = camera_info_msg.header.stamp.toSec();
-		if(prev_ok==true){
-			// compute camera info publish rate.
-			double_t off_time = camera_sync_time - prev_cinfo_stamp;
-			if(off_time > 0.0 && camera_info_msg.header.seq > prev_cinfo_sec){
-				uint32_t cnt = camera_info_msg.header.seq - prev_cinfo_sec;
-				double_t rate = (double_t)cnt / off_time;	// camera info publish rate [Hz]
-				if(rate >= 3.0 && rate <= 60.0){
-					frequency_odometry_hz_ave += (unsigned long)(1000000.0 / rate);
-					frequency_odometry_hz_ave /= 2; 
-					frequency_odometry_hz = frequency_odometry_hz_ave;	// 1 cycle time [micro sec]
-				}
-			}
-		}
-		prev_cinfo_stamp = camera_sync_time;
-		prev_cinfo_sec = camera_info_msg.header.seq;
-		prev_ok=true;
-	}
-}
-#elif defined(CAMERA_SYNC_EX)
-	void cameraSyncCallback(const sensor_msgs::Temperature& temp_msg){
-		camera_info_f = true;
-		//digitalWrite(LED_BUILTIN, HIGH-digitalRead(LED_BUILTIN));   // blink the blue
-
-		camera_sync_time = temp_msg.header.stamp.toSec();
-		camera_cap_hz = temp_msg.temperature;	// get camera caption rate [Hz]
-		if(camera_cap_hz > 0.0){
-			frequency_odometry_hz = (unsigned long)(1000000.0 / camera_cap_hz);	// add by nishi 2022.3.6
-		}
-	}
-#endif
-
 void motorRightIsrCounterDirection() {
 	motor_right_inc ++;
 	if ( motor_right_check_dir == 1) {
@@ -810,7 +953,7 @@ void rateControler(const float rate_ref, const float rate_est, int & pwm_rate,
 	prev_time = millis();
 	previous_epsilon = epsilon;
 
-	debug_left.z = i_epsilon * RATE_CONTROLLER_KI;
+	//debug_left.z = i_epsilon * RATE_CONTROLLER_KI;
 
 	pwm_rate = epsilon * RATE_CONTROLLER_KP
 			 + d_epsilon * RATE_CONTROLLER_KD
@@ -878,10 +1021,14 @@ void initMoter(void){
 /*******************************************************************************
 * ros::Time::now() implementation
 *******************************************************************************/
-ros::Time rosNow()
+//ros::Time rosNow()
+builtin_interfaces__msg__Time rosNow()
 {
-  return nh.now();
+	builtin_interfaces__msg__Time t;
+  //return nh.now();
+  return t;
 }
+
 
 /*******************************************************************************
 * Start Gyro Calibration
@@ -891,6 +1038,7 @@ void updateGyroCali(bool isConnected)
   static bool isEnded = false;
   char log_msg[50];
 
+  #ifdef USE_ROS1
   (void)(isConnected);
 
   if (nh.connected())
@@ -912,6 +1060,7 @@ void updateGyroCali(bool isConnected)
   {
     isEnded = false;
   }
+  #endif
 }
 /*******************************************************************************
 * Publish msgs (IMU data: angular velocity, linear acceleration, orientation)
@@ -920,10 +1069,12 @@ void publishImuMsg(void)
 {
   imu_msg = sensors.getIMU();
 
-  imu_msg.header.stamp    = rosNow();
-  imu_msg.header.frame_id = imu_frame_id;
+  imu_msg.header.stamp    = rosNow();		// Now dummy
+  imu_msg.header.frame_id.data = imu_frame_id;
+  imu_msg.header.frame_id.size = strlen(imu_frame_id);
+  imu_msg.header.frame_id.capacity = sizeof(imu_frame_id);
 
-  imu_pub.publish(&imu_msg);
+  //imu_pub.publish(&imu_msg);
 }
 
 #ifdef USE_MAG
@@ -946,11 +1097,13 @@ void publishImuMsg(void)
 *******************************************************************************/
 void publishVersionInfoMsg(void)
 {
+  #ifdef USE_ROS1
   version_info_msg.hardware = "0.0.0";
   version_info_msg.software = "0.0.0";
   version_info_msg.firmware = FIRMWARE_VER;
 
   version_info_pub.publish(&version_info_msg);
+  #endif
 }
 
 /*******************************************************************************
@@ -966,8 +1119,13 @@ void updateVariable(bool isConnected)
     {      
 	  // commment out ? by nishi 2021.10.55
 	  sen_init=false;
-      sensors.initIMU();
-      sen_init=true;
+	  for(int i=0;i<4;i++){
+      	if (0==sensors.initIMU()){
+	      sen_init=true;
+          break;
+		}
+	    delay(1000);        // delay mill sec 1000 [ms]
+	  }
 
       initOdom();
 
@@ -1002,8 +1160,8 @@ void updateTFPrefix(bool isConnected)
   {
     if (isChecked == false)
     {
-      nh.getParam("~tf_prefix", &get_tf_prefix);
-
+      //nh.getParam("~tf_prefix", &get_tf_prefix);
+	  get_tf_prefix[0]=0x00;
       if (!strcmp(get_tf_prefix, ""))
       {
         sprintf(odom_header_frame_id, "odom");
@@ -1033,53 +1191,47 @@ void updateTFPrefix(bool isConnected)
       }
 
       sprintf(log_msg, "Setup TF on Odometry [%s]", odom_header_frame_id);
-      nh.loginfo(log_msg); 
+      //nh.loginfo(log_msg); 
 
       sprintf(log_msg, "Setup TF on IMU [%s]", imu_frame_id);
-      nh.loginfo(log_msg); 
+      //nh.loginfo(log_msg); 
 
       sprintf(log_msg, "Setup TF on MagneticField [%s]", mag_frame_id);
-      nh.loginfo(log_msg); 
+      //nh.loginfo(log_msg); 
 
       sprintf(log_msg, "Setup TF on JointState [%s]", joint_state_header_frame_id);
-      nh.loginfo(log_msg); 
+      //nh.loginfo(log_msg); 
 
 	  // add by nishi 2022.9.9
 	  // use_tf_static==true -> publist tf base_footprint 
       use_tf_static=true;
 	  bool yes_no=true;
-      nh.getParam("~use_tf_static", &yes_no);
+      //nh.getParam("~use_tf_static", &yes_no);
       if (yes_no == false){
 		use_tf_static=false;
 		sprintf(log_msg, "Setup use_tf_static [false]");
-		nh.loginfo(log_msg); 
+		//nh.loginfo(log_msg); 
 	  }
 	  else{
 		sprintf(log_msg, "Setup use_tf_static [true]");
-		nh.loginfo(log_msg); 
+		//nh.loginfo(log_msg); 
 	  }
 
 	  use_imu_pub=false;
 	  yes_no=false;
-      nh.getParam("~use_imu_pub", &yes_no);
+      //nh.getParam("~use_imu_pub", &yes_no);
       if (yes_no == true){
 		use_imu_pub=true;
 		sprintf(log_msg, "Setup use_imu_pub [true]");
-		nh.loginfo(log_msg); 
+		//nh.loginfo(log_msg); 
 	  }
 	  else{
 		sprintf(log_msg, "Setup use_imu_pub [false]");
-		nh.loginfo(log_msg); 
+		//nh.loginfo(log_msg); 
 	  }
 
       isChecked = true;
 
-	  #if defined(CAMERA_SYNC) or defined(CAMERA_SYNC_EX)
-	  camera_info_f = false;
-	  #endif
-	  #if defined(CAMERA_SYNC)
-	  prev_ok=false;
-	  #endif
     }
   }
   else
@@ -1093,8 +1245,14 @@ void updateTFPrefix(bool isConnected)
 *******************************************************************************/
 void updateOdometry(void)
 {
-  odom.header.frame_id = odom_header_frame_id;
-  odom.child_frame_id  = odom_child_frame_id;
+  odom.header.frame_id.data = odom_header_frame_id;
+  // 此処は、後で見直し。 by nishi 2022.10.23
+  odom.header.frame_id.size = strlen(odom_header_frame_id);
+  odom.header.frame_id.capacity = sizeof(odom_header_frame_id);
+  odom.child_frame_id.data  = odom_child_frame_id;
+  // 此処は、後で見直し。 by nishi 2022.10.23
+  odom.child_frame_id.size = strlen(odom_child_frame_id);
+  odom.child_frame_id.capacity = sizeof(odom_child_frame_id);
 
   //odom.pose.pose.position.x = odom_pose[0];
   //odom.pose.pose.position.y = odom_pose[1];
@@ -1103,12 +1261,14 @@ void updateOdometry(void)
 
   //odom.twist.twist.linear.x  = odom_vel[0];
   //odom.twist.twist.angular.z = odom_vel[2];
+
 }
 /*******************************************************************************
 * Update the joint states 
 *******************************************************************************/
 void updateJointStates(void)
 {
+  #ifdef USE_ROS1
   static float joint_states_pos[WHEEL_NUM] = {0.0, 0.0};
   static float joint_states_vel[WHEEL_NUM] = {0.0, 0.0};
   //static float joint_states_eff[WHEEL_NUM] = {0.0, 0.0};
@@ -1125,21 +1285,24 @@ void updateJointStates(void)
   //Serial.println("updateJointState() : #9 passed!!");
   //Serial.println(*joint_states.position,DEC);
   //Serial.println(*(joint_states.position+1),DEC);
+  #endif
 
 }
 
 /*******************************************************************************
 * CalcUpdateulate the TF
 *******************************************************************************/
-void updateTF(geometry_msgs::TransformStamped& odom_tf)
+//void updateTF(geometry_msgs::TransformStamped& odom_tf)
+void updateTF(geometry_msgs__msg__TransformStamped& odom_tf)
 {
-  odom_tf.header = odom.header;	// odom or odom_fox
-  odom_tf.child_frame_id = odom.child_frame_id;	// base_footprint
+  //odom_tf.header = odom.header;	// odom or odom_fox
+  //odom_tf.child_frame_id = odom.child_frame_id;	// base_footprint
   odom_tf.transform.translation.x = odom.pose.pose.position.x;
   odom_tf.transform.translation.y = odom.pose.pose.position.y;
   odom_tf.transform.translation.z = odom.pose.pose.position.z;
   odom_tf.transform.rotation      = odom.pose.pose.orientation;
 }
+
 
 /*******************************************************************************
 * Update motor information
@@ -1187,6 +1350,7 @@ void initOdom(void)
 {
   init_encoder = true;
 
+  #ifdef USE_ROS1
   for (int index = 0; index < 3; index++)
   {
     odom_pose[index] = 0.0;
@@ -1209,6 +1373,7 @@ void initOdom(void)
   motor_tic.right=0;	// add by nishi
 
   yaw_est=0.;			// add by nishi
+  #endif
 
 }
 /*******************************************************************************
@@ -1216,6 +1381,7 @@ void initOdom(void)
 *******************************************************************************/
 void initJointStates(void)
 {
+  #ifdef USE_ROS1
   static char *joint_states_name[] = {(char*)"wheel_left_joint", (char*)"wheel_right_joint"};
 
   joint_states.header.frame_id = joint_state_header_frame_id;
@@ -1227,5 +1393,6 @@ void initJointStates(void)
   //joint_states.effort_length   = WHEEL_NUM;
   // update by nishi 2021.5.10
   joint_states.effort_length   = 0;
+  #endif
 
 }

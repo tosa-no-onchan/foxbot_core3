@@ -28,42 +28,70 @@
 #endif
 
 /* Include librairies */
-#include <ros.h>
-#include <ros/time.h>
-#include <tf/tf.h>
-#include <geometry_msgs/Twist.h>
-#include <nav_msgs/Odometry.h>
+#include <micro_ros_arduino.h>
+//#include <IMU.h>
+
+#include <stdio.h>
+#include <rcl/rcl.h>
+#include <rcl/error_handling.h>
+#include <rclc/rclc.h>
+#include <rclc/executor.h>
+
+#include <geometry_msgs/msg/transform_stamped.h>
+#include <tf2_msgs/msg/tf_message.h>
+
+// add by nishi
+#include <geometry_msgs/msg/twist.h>
+#include <nav_msgs/msg/odometry.h>
+//#include <std_msgs/msg/int32.h>
+
+//#include <micro_ros_utilities/type_utilities.h>
+//#include <micro_ros_utilities/string_utilities.h>
+
+rclc_executor_t executor;
+rclc_support_t support;
+rcl_allocator_t allocator;
+rcl_node_t node;
+rcl_timer_t timer;
+
+enum states {
+  WAITING_AGENT,
+  AGENT_AVAILABLE,
+  AGENT_CONNECTED,
+  AGENT_DISCONNECTED
+} state;
+
+
+//#define LED_PIN 13
+#define LED_PIN LED_BUILTIN
+
+
+#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
+#define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
+#define EXECUTE_EVERY_N_MS(MS, X)  do { \
+  static volatile int64_t init = -1; \
+  if (init == -1) { init = uxr_millis();} \
+  if (uxr_millis() - init > MS) { X; init = uxr_millis();} \
+} while (0)\
+
+extern "C" int clock_gettime(clockid_t unused, struct timespec *tp);
+//cIMU    IMU;
+
+
+// add by nishi for time
+const int timeout_ms = 1000;
+static int64_t time_ms,time_ns;
+static time_t time_seconds;
+
+// for foxbot_core3
+//float linear_velocity_ref;
+//float angular_velocity_ref;
+
+#include "turtlebot3_sensor.h"
+#include "com_lib.h"
 
 #include <Timer.h>
 #include <MedianFilter.h>
-
-// add by nishi
-#include <tf/transform_broadcaster.h>
-#include <sensor_msgs/JointState.h>
-#if defined(CAMERA_SYNC)
-    #include <sensor_msgs/CameraInfo.h>
-#endif
-
-#include <turtlebot3_msgs/SensorState.h>
-#include <turtlebot3_msgs/VersionInfo.h>
-#include <std_msgs/Empty.h>
-
-#include "turtlebot3_sensor.h"
-
-///
-//#include <ros.h>
-//#include <ros/time.h>
-#include <std_msgs/Bool.h>
-#include <std_msgs/Empty.h>
-#include <std_msgs/Int32.h>
-//#include <sensor_msgs/JointState.h>
-#include <geometry_msgs/Vector3.h>
-//#include <tf/tf.h>
-//#include <tf/transform_broadcaster.h>
-//#include <nav_msgs/Odometry.h>
-//
-#include <geometry_msgs/Point.h>
-#include <sensor_msgs/Temperature.h>
 
 #include <time.h>
 
@@ -244,31 +272,19 @@ float angular_velocity_ref;
 float linear_velocity_est;
 float angular_velocity_est;
 
-#if defined(CAMERA_SYNC)
-    /* Camera Info flag */
-    bool camera_info_f;
-    double_t camera_sync_time;   // camera_sync timestamp [sec]
-    float camera_cap_hz;  // camera caption rate [Hz]
-
-    bool prev_ok=false;
-    double_t prev_cinfo_stamp;
-    uint32_t prev_cinfo_sec;
-
-#elif defined(CAMERA_SYNC_EX)
-    /* Camera Info flag */
-    bool camera_info_f;
-    double_t camera_sync_time;   // camera_sync timestamp [sec]
-    float camera_cap_hz;  // camera caption rate [Hz]
-#endif
 
 
 float yaw_est;
-unsigned long odom_prev_time;
+//unsigned long odom_prev_time;
+uint64_t odom_prev_time;    // changed by nishi 2022.10.28
 
-/* ROS Nodehanlde */
-ros::NodeHandle  nh;
 
 /* Prototype function */
+void loop_main();
+bool create_entities();
+void destroy_entities();
+void set_my_time(int timeout_ms=1000);
+
 void rateControler(const float rate_ref, const float rate_est, int & pwm_rate,
                    unsigned long & prev_time, float & previous_epsilon,
                    float & integral_epsilon);
@@ -281,68 +297,72 @@ void initMoter(void);
 void updateOdometry(void);
 void updateTFPrefix(bool isConnected);
 void updateJointStates(void);
-void updateTF(geometry_msgs::TransformStamped& odom_tf);
+//void updateTF(geometry_msgs::TransformStamped& odom_tf);
+void updateTF(geometry_msgs__msg__TransformStamped& odom_tf);
 void updateMotorInfo(int32_t left_tick, int32_t right_tick);
 void initOdom(void);
 void initJointStates(void);
 void updateVariable(bool isConnected);
-ros::Time rosNow();     // add by nishi 2021.7.5
+//ros::Time rosNow();     // add by nishi 2021.7.5
+builtin_interfaces__msg__Time rosNow();
 void updateGyroCali(bool isConnected); // add by nishi 2021.11.3
 void publishImuMsg(void);   // add by nishi 2021.7.5
 #ifdef USE_MAG
     void publishMagMsg(void);   // add by nishi 2021.11.4
 #endif
 
+void update_motor(void *pvParameters);
+
 float q_prev[4];
 // add by nishi end
 
 /* Velocity command subscriber */
 // callback function prototype
-void commandVelocityCallback(const geometry_msgs::Twist& cmd_vel_msg);
+void commandVelocityCallback(const void *cmd_vel_msg);
 
-// message
-ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("/cmd_vel", commandVelocityCallback);
 
-#if defined(CAMERA_SYNC)
-    /* for stereo camera */
-    /* CameraInfo subscriber */
-    // callback function prototype
-    void cameraSyncCallback(const sensor_msgs::CameraInfo& camera_info_msg);
-    ros::Subscriber<sensor_msgs::CameraInfo> camera_sync_sub("/rgb/camera_info", cameraSyncCallback);
-    //ros::Subscriber<sensor_msgs::CameraInfo> camera_sync_sub("/stereo_publisher/stereo/camera_info", cameraSyncCallback);
-
-#elif defined(CAMERA_SYNC_EX)
-    /*  for OAK-D=Lite */
-    void cameraSyncCallback(const sensor_msgs::Temperature& temp_msg);
-    ros::Subscriber<sensor_msgs::Temperature> camera_sync_sub("/camera/sync", cameraSyncCallback);
-#endif
+/*******************************************************************************
+* Subscriber
+*******************************************************************************/
+// "cmd_vel"
+rcl_subscription_t cmd_vel_subscriber;
+geometry_msgs__msg__Twist cmd_vel_msg0;
 
 
 /*******************************************************************************
 * Publisher
 *******************************************************************************/
 // Version information of Turtlebot3
-turtlebot3_msgs::VersionInfo version_info_msg;
-ros::Publisher version_info_pub("firmware_version", &version_info_msg);
+//turtlebot3_msgs::VersionInfo version_info_msg;
+//ros::Publisher version_info_pub("firmware_version", &version_info_msg);
 
 // IMU of Turtlebot3    add by nishi 2021.7.5
-sensor_msgs::Imu imu_msg;
-ros::Publisher imu_pub("imu", &imu_msg);
+//sensor_msgs::Imu imu_msg;
 
-/* Odometry publisher */
-//nav_msgs::Odometry odom;
-//ros::Publisher odom_publisher("odom", &odom);
+sensor_msgs__msg__Imu imu_msg;
+
+//ros::Publisher imu_pub("imu", &imu_msg);
+
+/*-------------------------------------------------------
+-- Odometry publisher
+--------------------------------------------------------*/
+// Odometry of Turtlebot3 ROS2
+nav_msgs__msg__Odometry odom;
+rcl_publisher_t odom_publisher;
+const char * odom_topic_name = "odom_fox";
+// type support
+//const rosidl_message_type_support_t * odom_type_support = ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry);
 
 // Odometry of Turtlebot3
-nav_msgs::Odometry odom;
+//nav_msgs::Odometry odom;
 //ros::Publisher odom_pub("odom", &odom);
 // test by nishi 2021.10.8
-ros::Publisher odom_pub("odom_fox", &odom);
+//ros::Publisher odom_pub("odom_fox", &odom);
 
 // add by nishi start
 // Joint(Dynamixel) state of Turtlebot3
-sensor_msgs::JointState joint_states;
-ros::Publisher joint_states_pub("joint_states", &joint_states);
+//sensor_msgs::JointState joint_states;
+//ros::Publisher joint_states_pub("joint_states", &joint_states);
 
 #if defined(USE_MAG)
     // Magnetic field
@@ -353,9 +373,16 @@ ros::Publisher joint_states_pub("joint_states", &joint_states);
 /*******************************************************************************
 * Transform Broadcaster
 *******************************************************************************/
-// TF of Turtlebot3
-geometry_msgs::TransformStamped odom_tf;
-tf::TransformBroadcaster tf_broadcaster;
+// TF of Turtlebot3 ROS2
+rcl_publisher_t tf_publisher;
+const char * tf_topic_name = "tf";
+
+tf2_msgs__msg__TFMessage * tf_message;  // 複数 Entry 在るので、memory 上に作成する。
+
+//geometry_msgs::TransformStamped odom_tf;
+geometry_msgs__msg__TransformStamped odom_tf;
+
+//tf::TransformBroadcaster tf_broadcaster;
 
 struct MOTOR_TIC{
     int32_t left;
@@ -374,12 +401,12 @@ bool sen_init=false;
 
 /* DEBUG */
 //#include <geometry_msgs/Point.h>
-geometry_msgs::Point debug_left;
-ros::Publisher debug_publisher1("debug_left", &debug_left);
+//geometry_msgs::Point debug_left;
+//ros::Publisher debug_publisher1("debug_left", &debug_left);
 
 //#include <geometry_msgs/Point.h>
-geometry_msgs::Point debug_right;
-ros::Publisher debug_publisher2("debug_right", &debug_right);
+//geometry_msgs::Point debug_right;
+//ros::Publisher debug_publisher2("debug_right", &debug_right);
 
 template <typename type>
 type sign(type value) {
@@ -397,7 +424,9 @@ double odom_vel[3];
 * SoftwareTimer of Turtlebot3
 *******************************************************************************/
 //static uint32_t tTime[10]={0,0,0,0,0,0,0,0,0,0};
-static unsigned long tTime[10]={0,0,0,0,0,0,0,0,0,0};
+//static unsigned long tTime[10]={0,0,0,0,0,0,0,0,0,0};
+static foxbot3::usec_t tTime[10]={0,0,0,0,0,0,0,0,0,0};        //changed by nishi 2022.10.28
+// [7] : set_my_time() wait time
 
 //uint32_t frequency_odometry_hz;     // FREQUENCY_ODOMETRY_HZ
 unsigned long frequency_odometry_hz;     // FREQUENCY_ODOMETRY_HZ

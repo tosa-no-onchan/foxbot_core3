@@ -33,14 +33,18 @@
 #define FALSE false
 #endif
 
-
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/MagneticField.h>
+#ifdef USE_ROS
+  #include <sensor_msgs/Imu.h>
+  #include <sensor_msgs/MagneticField.h>
+#else
+  #include <sensor_msgs/msg/imu.h>
+  #include <sensor_msgs/msg/magnetic_field.h>
+#endif
 
 #if defined NOETIC_SUPPORT
   #include <sensor_msgs/BatteryStateNoetic.h>
 #else
-  #include <sensor_msgs/BatteryState.h>
+  //#include <sensor_msgs/BatteryState.h>
 #endif
 
 // changed by nishi
@@ -81,14 +85,16 @@ class Turtlebot3Sensor
   //bool init(MPU9250_DMP *imu);
 
   // IMU
-  void initIMU(void);
-  sensor_msgs::Imu getIMU(void);
+  uint8_t initIMU(void);
+  //sensor_msgs::Imu getIMU(void);
+  sensor_msgs__msg__Imu getIMU(void);
   void updateIMU(void);
   void calibrationGyro(void);
   void copyIMU(void);
 
   float* getOrientation(void);
-  sensor_msgs::MagneticField getMag(void);
+  //sensor_msgs::MagneticField getMag(void);
+  sensor_msgs__msg__MagneticField getMag(void);
 
   // Battery
   float checkVoltage(void);
@@ -124,13 +130,16 @@ class Turtlebot3Sensor
 
 
  private:
-  sensor_msgs::Imu           imu_msg_;
+  //sensor_msgs::Imu           imu_msg_;
+  sensor_msgs__msg__Imu     imu_msg_;
   #if defined NOETIC_SUPPORT
     sensor_msgs::BatteryStateNoetic  battery_state_msg_;
   #else
-    sensor_msgs::BatteryState  battery_state_msg_;
+    //sensor_msgs::BatteryState  battery_state_msg_;
   #endif
-  sensor_msgs::MagneticField mag_msg_;
+  
+  //sensor_msgs::MagneticField mag_msg_;
+  sensor_msgs__msg__MagneticField mag_msg_;
 
   //cIMU imu_;
   // changed by nishi
