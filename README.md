@@ -45,6 +45,19 @@ foxbot_core3 (ros noetic) 版を、ros2 foxy 向けに改造しました。
       Import Arduino Project or Open project  
       Espressif ESP32 Dev Module  
       select ~/Documents/PlatformIO/Projects/foxbot_core3_r2  
+
+6. Change something 
+    
+    ~/Arduino/lib-foxbot_core3_r2/micro_ros_arduino/src/default_transport.cpp  
+      ....   
+      bool arduino_transport_open(struct uxrCustomTransport * transport)  
+      {  
+        //Serial.begin(115200);  
+        // changed by nishi  
+        Serial.begin(1000000);    // 1M  
+        return true;  
+      }  
+
       
     
    
