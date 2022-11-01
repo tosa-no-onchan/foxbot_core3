@@ -14,13 +14,14 @@ foxbot_core3 (ros noetic) 版を、ros2 foxy 向けに改造しました。
 1. download this proj.  
     
     $ git clone https://github.com/tosa-no-onchan/foxbot_core3.git  
+    $ cd foxbot_core3  
   
 2. copy foxbot_core3_r2 to vscode Platformio IDE Project  
     
     $ copy -ar foxbot_core3_r2 ~/Documents/PlatformIO/Projects  
 
 
-3. copy Arduino/lib-foxbot_core3_r2 to your-home-dir  
+3. copy Arduino/lib-foxbot_core3_r2 to ~/Arduino
     
     $ cd Arduino  
     $ cp -ar lib-foxbot_core3_r2 ~/Arduino  
