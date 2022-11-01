@@ -1,0 +1,36 @@
+1. hwo to run telop
+
+1) SBC(Jetson Nano 2G)
+  $ sudo chmod 777 /dev/ttyTHS1 or /dev/ttyUSB0
+  $ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyTHS1 -b 1000000 [-v6]
+
+2) Remote PC
+  a) RViz2
+  $ ros2 launch turtlebot3_bringup rviz2.launch.py
+
+  b) Teleop
+  $ ros2 run turtlebot3_teleop teleop_keyboard
+
+check
+$ ros2 topic list
+$ ros2 topic hz /odom_fox
+
+
+2. SLAM
+2) Remote PC だけ変更。
+  a) SLAM 
+  $ ros2 launch turtlebot3_cartographer cartographer.launch.py
+
+  b) Teleop
+  $ ros2 run turtlebot3_teleop teleop_keyboard
+
+結果
+1) Map が出てこない。
+
+[occupancy_grid_node-2] [WARN] [1666703045.242521212] [occupancy_grid_node]: submap_slices and last_frame_id is empty
+
+検索
+https://github.com/ROBOTIS-GIT/turtlebot3/issues/890
+
+Now I fixed one problem.
+I found the LDS_MODEL value in my SBC's bashrc file is LDS-01. After updating it to LDS-02 I can now see the /map topic is publishing data. But /scan topic is still empty.
