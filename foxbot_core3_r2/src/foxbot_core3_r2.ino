@@ -291,6 +291,7 @@ void loop_test(){
 #endif
 
 void loop() {
+  states state_prv=state;
   switch (state) {
     case WAITING_AGENT:
       EXECUTE_EVERY_N_MS(500, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
@@ -313,7 +314,8 @@ void loop() {
       break;
     case AGENT_CONNECTED:
       //EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
-	  if(RMW_RET_OK != rmw_uros_ping_agent(100, 1)){
+	  //if(RMW_RET_OK != rmw_uros_ping_agent(100, 1)){
+	  if(RMW_RET_OK != rmw_uros_ping_agent(100, 3)){	// changed by nishi 2022.12.5
 		state = AGENT_DISCONNECTED;
 	  }
       if (state == AGENT_CONNECTED) {
@@ -346,11 +348,13 @@ void loop() {
       break;
   }
 
-  if (state == AGENT_CONNECTED) {
-    //digitalWrite(LED_PIN, 1);
-  } 
-  else {
-    //digitalWrite(LED_PIN, 0);
+  if(state != state_prv){
+	if (state == AGENT_CONNECTED) {
+	  digitalWrite(LED_BUILTIN, LOW);		// light OFF
+	} 
+	else {
+	  digitalWrite(LED_BUILTIN, HIGH);	// light ON
+	}
   }
 }
 
