@@ -57,8 +57,17 @@ foxbot_core3 (ros noetic) 版を、ros2 foxy 向けに改造しました。
         Serial.begin(1000000);    // 1M  
         return true;  
       }  
-
-      
     
+7. Choose foxbot_core3_r2 pubish topics    
+    
+    foxbot_core3_r2_config.h    
+    // add by nishi 2022.9.9    
+    // use_tf_static==true : publist tf odom -> base_footprint   
+    bool use_tf_static=true;    
+    // use_imu_pub==true : publist 'imu'   
+    bool use_imu_pub=false;    
+    
+    
+
    
 
