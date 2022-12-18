@@ -56,28 +56,28 @@ foxbot_core3 (ros noetic) 版を、ros2 foxy 向けに改造しました。
     $ git clone -b foxy https://github.com/micro-ROS/micro_ros_arduino.git  
 
 #### 5. Import source code to Vscode Platformio IDE project  
+start vscode  
     
-    start vscode  
     PlatformIO::Home  
       Import Arduino Project or Open project  
       Espressif ESP32 Dev Module  
       select ~/Documents/PlatformIO/Projects/foxbot_core3_r2  
 
 #### 6. Change something 
+Edit ~/Arduino/lib-foxbot_core3_r2/micro_ros_arduino/src/default_transport.cpp  
     
-    ~/Arduino/lib-foxbot_core3_r2/micro_ros_arduino/src/default_transport.cpp  
-      ....   
-      bool arduino_transport_open(struct uxrCustomTransport * transport)  
-      {  
-        //Serial.begin(115200);  
-        // changed by nishi  
-        Serial.begin(1000000);    // 1M  
-        return true;  
-      }  
+    ....   
+    bool arduino_transport_open(struct uxrCustomTransport * transport)  
+    {  
+      //Serial.begin(115200);  
+      // changed by nishi  
+      Serial.begin(1000000);    // 1M  
+      return true;  
+    }  
     
 #### 7. Chose foxbot_core3_r2 pubish topics    
+Edit foxbot_core3_r2_config.h  
     
-    foxbot_core3_r2_config.h    
     // add by nishi 2022.9.9    
     // use_tf_static==true : publist tf odom -> base_footprint   
     bool use_tf_static=true;    
@@ -85,11 +85,13 @@ foxbot_core3 (ros noetic) 版を、ros2 foxy 向けに改造しました。
     bool use_imu_pub=false;    
 
 #### 8. How to Run    
-    
-    On SBC  
+On SBC  
+      
       $ sudo chmod 777 /dev/ttyTHS1  
       $ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyTHS1 -b 1000000  
-    On Remote PC  
+
+On Remote PC  
+      
       $ sudo ufw disable  
       $ ros2 topic list  
       $ ros2 run turtlebot3_teleop teleop_keyboard
