@@ -336,10 +336,17 @@ geometry_msgs__msg__Twist cmd_vel_msg0;
 //turtlebot3_msgs::VersionInfo version_info_msg;
 //ros::Publisher version_info_pub("firmware_version", &version_info_msg);
 
+/*-------------------------------------------------------
+-- IMU publisher
+  reffer https://github.com/micro-ROS/micro_ros_arduino/issues/881
+--------------------------------------------------------*/
 // IMU of Turtlebot3    add by nishi 2021.7.5
 //sensor_msgs::Imu imu_msg;
 
 sensor_msgs__msg__Imu imu_msg;
+rcl_publisher_t imu_publisher;
+const char * imu_topic_name = "imu";
+//const char * imu_topic_name = "imu_fox";
 
 //ros::Publisher imu_pub("imu", &imu_msg);
 
@@ -471,7 +478,9 @@ char mag_frame_id[30];
 char joint_state_header_frame_id[30];
 
 // add by nishi 2022.9.9
+// use_tf_static==true : publist tf odom -> base_footprint 
 bool use_tf_static=true;
+// use_imu_pub==true : publist 'imu_fox' 
 bool use_imu_pub=false;
 
 #endif // FOXBOT_CORE_CONFIG_H_

@@ -72,8 +72,6 @@ SemaphoreHandle_t xMutex = NULL;
 int cnt4=0;
 
 
-
-
 const void euler_to_quat(float x, float y, float z, double* q) {
     float c1 = cos((y*3.14/180.0)/2);
     float c2 = cos((z*3.14/180.0)/2);
@@ -214,7 +212,9 @@ void setup(){
 	// test by nishi
 	//Serial.begin(1000000);
 
+	//------------------
 	// alloc TF Message
+	//------------------
 	tf_message = tf2_msgs__msg__TFMessage__create();
 	geometry_msgs__msg__TransformStamped__Sequence__init(&tf_message->transforms, 1);
 
@@ -561,7 +561,7 @@ void loop_main(){
 		RCSOFTCHECK(rcl_publish(&odom_publisher, &odom, NULL));
 
 		// add by nishi 2022.9.9
-		// use_tf_static==true -> publist tf base_footprint 
+		// use_tf_static==true : publist tf odom -> base_footprint 
 		if(use_tf_static==true){
 			// add by nishi for TF  2021.4.26
 			// odometry tf
@@ -682,12 +682,13 @@ bool create_entities()
 
 	#endif
 
-	// craete publisher for "odom_fox"
+	// create publisher for "odom_fox"
 	RCCHECK(rclc_publisher_init_default(
-		&odom_publisher, &node,
+		&odom_publisher, 
+		&node,
 		//odom_type_support,
 		ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry), 
-		odom_topic_name));	
+		odom_topic_name));
 
 	// create publisher for "tf"
 	RCCHECK(rclc_publisher_init_default(
@@ -695,6 +696,13 @@ bool create_entities()
 		&node,
 		ROSIDL_GET_MSG_TYPE_SUPPORT(tf2_msgs, msg, TFMessage),
 		tf_topic_name));
+
+	// create publisher for "IMU"
+	RCCHECK(rclc_publisher_init_best_effort(
+		&imu_publisher,
+		&node,
+		ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
+		imu_topic_name));
 
 	// create subscriber Int32
 	//RCCHECK(rclc_subscription_init_default(
@@ -735,6 +743,7 @@ void destroy_entities()
 
   rc=rcl_publisher_fini(&odom_publisher, &node);
   rc=rcl_publisher_fini(&tf_publisher, &node);
+  rc=rcl_publisher_fini(&imu_publisher, &node);
   rc=rcl_subscription_fini(&cmd_vel_subscriber, &node);
 
   rc=rcl_timer_fini(&timer);
@@ -1068,6 +1077,7 @@ void updateGyroCali(bool isConnected)
 }
 /*******************************************************************************
 * Publish msgs (IMU data: angular velocity, linear acceleration, orientation)
+* https://github.com/micro-ROS/micro_ros_arduino/issues/881
 *******************************************************************************/
 void publishImuMsg(void)
 {
@@ -1079,6 +1089,7 @@ void publishImuMsg(void)
   imu_msg.header.frame_id.capacity = sizeof(imu_frame_id);
 
   //imu_pub.publish(&imu_msg);
+  RCSOFTCHECK(rcl_publish(&imu_publisher, &imu_msg, NULL));
 }
 
 #ifdef USE_MAG
@@ -1208,11 +1219,8 @@ void updateTFPrefix(bool isConnected)
 
 	  // add by nishi 2022.9.9
 	  // use_tf_static==true -> publist tf base_footprint 
-      use_tf_static=true;
-	  bool yes_no=true;
       //nh.getParam("~use_tf_static", &yes_no);
-      if (yes_no == false){
-		use_tf_static=false;
+      if (use_tf_static == false){
 		sprintf(log_msg, "Setup use_tf_static [false]");
 		//nh.loginfo(log_msg); 
 	  }
@@ -1221,11 +1229,8 @@ void updateTFPrefix(bool isConnected)
 		//nh.loginfo(log_msg); 
 	  }
 
-	  use_imu_pub=false;
-	  yes_no=false;
       //nh.getParam("~use_imu_pub", &yes_no);
-      if (yes_no == true){
-		use_imu_pub=true;
+      if (use_imu_pub == true){
 		sprintf(log_msg, "Setup use_imu_pub [true]");
 		//nh.loginfo(log_msg); 
 	  }
