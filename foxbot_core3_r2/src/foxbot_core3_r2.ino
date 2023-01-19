@@ -55,9 +55,7 @@
 #if defined(ESP32)
 	#include <WiFi.h>
 	//const char SSID[] = "WiFi ID";
-	const char SSID[] = "elecom2g-DE45B0";
 	//const char PASSWORD[] = "WiFi passsword";
-	const char PASSWORD[] = "2389676465277";
 	IPAddress server(192,168,1,170);
 	const uint16_t serverPort = 11411;
 	WiFiClient client;
