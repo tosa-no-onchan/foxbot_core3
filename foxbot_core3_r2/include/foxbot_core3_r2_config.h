@@ -480,6 +480,7 @@ char joint_state_header_frame_id[30];
 // add by nishi 2022.9.9
 // use_tf_static==true : publist tf odom -> base_footprint 
 bool use_tf_static=true;
+
 // use_imu_pub==true : publist 'imu_fox' 
 bool use_imu_pub=false;
 

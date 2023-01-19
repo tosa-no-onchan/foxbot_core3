@@ -61,6 +61,7 @@
 	WiFiClient client;
 #endif
 
+//#define ROS2_FOXY
 #define ODOM_USE_IMU
 
 // Multi task
@@ -633,7 +634,8 @@ void loop_main(){
 	if (t >= tTime[5]){
 		// Subscribe topic の 受信時に必要
 		//RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
-		RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(2)));
+		//RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(2)));
+		RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(2)));	// update by nishi 2023.1.19
 
 	    //tTime[5] = t + 2000;	// wait 2[ms]
 	    tTime[5] = t + 20000;	// wait 20[ms]
@@ -657,7 +659,9 @@ bool create_entities()
 	allocator = rcl_get_default_allocator();
 
 	//create init_options
-	RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+	#ifdef ROS2_FOXY
+		RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+	#endif
 
 	#ifdef USE_ORG1
 		// create node
@@ -665,18 +669,22 @@ bool create_entities()
 	#else
 		// create node
 		// reffer from  https://qiita.com/ousagi_sama/items/a814b3db925b7ce2aeea
-		// ノードの生成 (foxy版)
-		rcl_node_options_t node_ops = rcl_node_get_default_options();
-		node_ops.domain_id = (size_t)(30);		// ドメインIDの設定
-		//rclc_node_init_with_options(&node, "node_name", "namespace", &support, &node_ops);
-		rclc_node_init_with_options(&node, "micro_ros_arduino_node", "", &support, &node_ops);
+		#ifdef ROS2_FOXY
+			// ノードの生成 (foxy版)
+			rcl_node_options_t node_ops = rcl_node_get_default_options();
+			node_ops.domain_id = (size_t)(30);		// ドメインIDの設定
+			//rclc_node_init_with_options(&node, "node_name", "namespace", &support, &node_ops);
+			rclc_node_init_with_options(&node, "micro_ros_arduino_node", "", &support, &node_ops);
+		#else
+			// ノードの生成 (galactic版以降)
+			rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
+			RCSOFTCHECK(rcl_init_options_init(&init_options, allocator));
+			RCSOFTCHECK(rcl_init_options_set_domain_id(&init_options, 30));		// ドメインIDの設定
+			rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator); // 前のrclc_support_initは削除する
+			//rclc_node_init_default(&node, "node_name", "namespace", &support);
+			rclc_node_init_default(&node, "micro_ros_arduino_node", "", &support);
 
-		// ノードの生成 (galactic版以降)
-		//rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
-		//RCSOFTCHECK(rcl_init_options_init(&init_options, allocator));
-		//RCSOFTCHECK(rcl_init_options_set_domain_id(&init_options, 30));		// ドメインIDの設定
-		//rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator); // 前のrclc_support_initは削除する
-		//rclc_node_init_default(&node, "node_name", "namespace", &support);
+		#endif
 
 	#endif
 
