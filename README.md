@@ -53,7 +53,7 @@ foxbot_core3 (ros noetic) 版を、ros2 galactic 向けに改造しました。
     $ git clone SparkFun_ICM-20948_ArduinoLibrary to here  
     
     4.2 down load micro-ROS for Arduino  
-    $ git clone -b foxy https://github.com/micro-ROS/micro_ros_arduino.git  
+    $ git clone -b galactic https://github.com/micro-ROS/micro_ros_arduino.git  
 
 #### 5. Import source code to Vscode Platformio IDE project  
 start vscode  
