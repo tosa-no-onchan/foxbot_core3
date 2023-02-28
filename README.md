@@ -9,18 +9,18 @@ foxbot_core3 (ros noetic) 版を、ros2 foxy 向けに改造しました。
       Ubuntu Mate 20.04  
       ESP32  Arduino  
       Vscode and Platformio IDE  
-      ros2 foxy  
+      ros2 galactic  
       micro-ROS for Arduino  
 
 #### [動作環境]  
     
     Remote PC  
       Ubuntu Mate 20.04  
-      ros2 foxy  
+      ros2 galactic  
     SBC  
       Jetson Nano 2G  
       JetPack 4.x and Ubuntu 20.04  
-      Ros2 foxy  
+      Ros2 galactic  
       micro-ROS Agent  
     SOC  
       ESP32  
@@ -96,4 +96,9 @@ On Remote PC
       $ ros2 topic list  
       $ ros2 run turtlebot3_teleop teleop_keyboard
    
-
+#### 9. Change LOG    
+2023.2.28  
+      
+      ESP32 Serial2 is used for Trace.  
+      TX:17  RX:16  
+      LED is 14  
