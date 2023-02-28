@@ -1,5 +1,5 @@
 ### foxbot_core3 for ros2
-foxbot_core3 (ros noetic) 版を、ros2 foxy 向けに改造しました。 
+foxbot_core3 (ros noetic) 版を、ros2 galactic 向けに改造しました。 
 
 詳しい内容は、[こちら。](http://www.netosa.com/blog/2022/10/ros2-esp32arduino.html)  
   
