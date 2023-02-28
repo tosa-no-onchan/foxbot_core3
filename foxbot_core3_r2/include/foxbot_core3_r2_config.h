@@ -36,6 +36,9 @@
 #include <rcl/error_handling.h>
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
+// add by nishi 2023.2.24
+#include <rmw_microros/rmw_microros.h>
+#include <std_msgs/msg/int32.h>
 
 #include <geometry_msgs/msg/transform_stamped.h>
 #include <tf2_msgs/msg/tf_message.h>
@@ -54,20 +57,31 @@ rcl_allocator_t allocator;
 rcl_node_t node;
 rcl_timer_t timer;
 
+// add 2023.2.24
+rcl_init_options_t init_options;
+
 enum states {
   WAITING_AGENT,
   AGENT_AVAILABLE,
   AGENT_CONNECTED,
-  AGENT_DISCONNECTED
-} state;
-
+  AGENT_CONNECT_WATCH,  // add by nishi 2023.2.27
+  AGENT_DISCONNECTED,
+  AGENT_INIT       // add by nishi 2023.2.25
+};
+states state;
+states trace_prv;
+int agent_connect_check_cnt;
+int init_cnt=0;
 
 //#define LED_PIN 13
 #define LED_PIN LED_BUILTIN
 
 
-#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
+//#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
+#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop(temp_rc);}}
+#define RCCHECK_PROC(proc,fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop2(proc,temp_rc);}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
+#define RCSOFTCHECK_PROC(proc,fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){warn_trace(proc,temp_rc);}}
 #define EXECUTE_EVERY_N_MS(MS, X)  do { \
   static volatile int64_t init = -1; \
   if (init == -1) { init = uxr_millis();} \

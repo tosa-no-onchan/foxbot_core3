@@ -81,8 +81,8 @@ class Turtlebot3Sensor
   Turtlebot3Sensor();
   ~Turtlebot3Sensor();
 
-  bool init(unsigned long baud=115200);
-  //bool init(MPU9250_DMP *imu);
+  //bool init(unsigned long baud=115200);
+  uint8_t init(unsigned long baud=115200);
 
   // IMU
   uint8_t initIMU(void);

@@ -32,8 +32,8 @@ Turtlebot3Sensor::~Turtlebot3Sensor()
   #endif
 }
 
-bool Turtlebot3Sensor::init(unsigned long baud)
-//bool Turtlebot3Sensor::init(MPU9250_DMP *imu)
+//bool Turtlebot3Sensor::init(unsigned long baud)
+uint8_t Turtlebot3Sensor::init(unsigned long baud)
 {
   #ifdef DEBUG_N
   DEBUG_SERIAL.begin(baud);

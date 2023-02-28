@@ -14,8 +14,8 @@
 #include <Arduino.h>
 #include "IMU.h"
 
-#define LED_BUILTIN 17
-//#define LED_BUILTIN 4
+//#define LED_BUILTIN 17
+#define LED_BUILTIN 4
 
 /*---------------------------------------------------------------------------
      TITLE   : BLE
