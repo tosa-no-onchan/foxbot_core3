@@ -96,9 +96,15 @@ On Remote PC
       $ ros2 topic list  
       $ ros2 run turtlebot3_teleop teleop_keyboard
    
-#### 9. Change LOG    
+#### 9. Update    
 2023.2.28  
       
-      ESP32 Serial2 is used for Trace.  
-      TX:17  RX:16  
-      LED is 14  
+      1) ESP32 Serial2 is used for Trace.  
+        TX:17  RX:16  
+      2) LED is 14 
+      3) galactic 版になってから、通信断時の再接続が、途中でエラーになっていた点の修正。  
+      4) 再接続した際に、従来は、 IMUのリセット、odom、TF の位置、向き情報の初期化をしていましたが、それを止めにしました。  
+        IMUのリセット、odom、TF の位置、向き情報の初期化 は、ESP32 が起動した時のみとしました。  
+      5) 通信断になっている間は、モータ駆動を即止める。  
+      これで、ロボットの位置、向き情報が継続されるので、通信エラーが有っても無視できます。  
+      注) ROS のほうでも、この問題が出ているものと思います。いずれ、バックポートしなければいかんぞね。  
