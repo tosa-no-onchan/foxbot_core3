@@ -43,19 +43,24 @@ foxbot_core3 (ros noetic) 版を、ros2 galactic 向けに改造しました。
     $ cd Arduino  
     $ cp -ar lib-foxbot_core3_r2 ~/Arduino  
   
+#### 4. copy foxbot_tool to ~/colcon_ws/src
+    
+    $ cp -ar foxbot_tool ~/colcon_ws/src  
+    $ cd ~/colcon_ws  
+    $ colcon build --symlink-install --packages-select foxbot_tool  
   
 
-#### 4. download Arduino other Library 
+#### 5. download Arduino other Library 
     
     $ cd ~/Arduino/lib-foxbot_core3_r2  
     
-    4.1 down load SparkFun_ICM-20948_ArduinoLibrary  
+    5.1 down load SparkFun_ICM-20948_ArduinoLibrary  
     $ git clone SparkFun_ICM-20948_ArduinoLibrary to here  
     
-    4.2 down load micro-ROS for Arduino  
+    5.2 down load micro-ROS for Arduino  
     $ git clone -b galactic https://github.com/micro-ROS/micro_ros_arduino.git  
 
-#### 5. Import source code to Vscode Platformio IDE project  
+#### 6. Import source code to Vscode Platformio IDE project  
 start vscode  
     
     PlatformIO::Home  
@@ -63,7 +68,7 @@ start vscode
       Espressif ESP32 Dev Module  
       select ~/Documents/PlatformIO/Projects/foxbot_core3_r2  
 
-#### 6. Change something 
+#### 7. Change something 
 Edit ~/Arduino/lib-foxbot_core3_r2/micro_ros_arduino/src/default_transport.cpp  
     
     ....   
@@ -75,7 +80,7 @@ Edit ~/Arduino/lib-foxbot_core3_r2/micro_ros_arduino/src/default_transport.cpp
       return true;  
     }  
     
-#### 7. Chose foxbot_core3_r2 pubish topics    
+#### 8. Chose foxbot_core3_r2 pubish topics    
 Edit foxbot_core3_r2_config.h  
     
     // add by nishi 2022.9.9    
@@ -84,7 +89,7 @@ Edit foxbot_core3_r2_config.h
     // use_imu_pub==true : publist 'imu'   
     bool use_imu_pub=false;    
 
-#### 8. How to Run    
+#### 9. How to Run    
 On SBC  
       
       $ sudo chmod 777 /dev/ttyTHS1  
@@ -94,9 +99,10 @@ On Remote PC
       
       $ sudo ufw disable  
       $ ros2 topic list  
+      $ ros2 run foxbot_tool heart_beat  
       $ ros2 run turtlebot3_teleop teleop_keyboard
    
-#### 9. Update    
+#### 10. Update    
 2023.2.28  
       
       1) ESP32 Serial2 is used for Trace.  
@@ -108,3 +114,8 @@ On Remote PC
       5) 通信断になっている間は、モータ駆動を即止める。  
       これで、ロボットの位置、向き情報が継続されるので、通信エラーが有っても無視できます。  
       注) ROS のほうでも、この問題が出ているものと思います。いずれ、バックポートしなければいかんぞね。  
+
+2023.3.16  
+      
+      1) heart beat を追加。  
+      
