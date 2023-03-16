@@ -119,5 +119,5 @@ On Remote PC
       
       1) heart beat を追加。  
         /pc_beat が、Publish されている時のみ、/cmd_vel を取り込みます。  
-      2) micro-ROS Agent との通信が途絶えると、ロボットを停止します。  
+        
       
