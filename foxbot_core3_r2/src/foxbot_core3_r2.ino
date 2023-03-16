@@ -43,7 +43,9 @@
 
 #include <sys/time.h>  // for struct timeval
 
-#define USE_TRACE
+//#define USE_TRACE
+// platformio.ini
+// -D USE_TRACE
 
 #if defined(BOARD_ESP32)
 #include "soc/soc.h"
@@ -425,7 +427,7 @@ void loop() {
 
 		// set_my_time() wait time
 		tTime[7] = foxbot3::micros_() + (5 * 60 * 1000000UL );	// 5[minute]
-		//tTime[8] = foxbot3::micros_() + (1 * 1000000UL );	// 1[sec]  add by nishi 2023.2.26
+		tTime[8] = foxbot3::micros_() + (1 * 1000000UL );	// 1[sec]  add by nishi 2023.2.26
 
 		// 初期化は、1回のみにします。 by nishi 2023.2.28
 		if(init_cnt==0){
@@ -446,10 +448,42 @@ void loop() {
 			agent_connect_check_cnt=5;
 		}
 		if (state == AGENT_CONNECTED) {
+			#if defined(USE_PC_BEAT)
+				foxbot3::usec_t t0 = foxbot3::micros_();
+				// check pc_beat 
+				if(use_beat == true && t0 >= tTime[8]){
+					// beat lost
+					if(beat_no == beat_no_prev){
+						// stop moter drive
+						linear_velocity_ref=0.0;
+						angular_velocity_ref=0.0;
+						beat_ok=false;
+						if(beat_ok_prev != beat_ok){
+							#if defined(USE_TRACE)
+								mySerial2.println("pc_beat stop!!");
+							#endif
+						}
+					}
+					// beat active
+					else{
+						beat_ok=true;
+						if(beat_ok_prev != beat_ok){
+							#if defined(USE_TRACE)
+								mySerial2.println("pc_beat ok!!");
+							#endif
+						}
+					}
+					beat_no_prev = beat_no;
+					beat_ok_prev = beat_ok;
+
+					tTime[8] = t0 + (1* 1000000UL );	// 1[sec]
+				}
+			#endif
 			// 従来の loop() 処理
 			loop_main();
 			// 受信 処理
 			//rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+			//RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(20)));
 
 			// syscronize NTP
 			foxbot3::usec_t t = foxbot3::micros_();
@@ -801,7 +835,7 @@ void loop_main(){
 		RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(2)));	// update by nishi 2023.1.19
 
 	    //tTime[5] = t + 2000;	// wait 2[ms]
-	    tTime[5] = t + 20000;	// wait 20[ms]
+	    tTime[5] = t + (1000000UL / FREQUENCY_ROSPINONCE_HZ);	// wait 20[ms]
 	}
 
 }
@@ -812,8 +846,16 @@ void commandVelocityCallback(const void *cmd_vel_msg){
 	const geometry_msgs__msg__Twist * msg = (const geometry_msgs__msg__Twist *)cmd_vel_msg;
 	// if velocity in x direction is 0 turn off LED, if 1 turn on LED
 	//digitalWrite(LED_PIN, (msg->linear.x == 0) ? LOW : HIGH);
-	linear_velocity_ref  = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->linear.x;
-	angular_velocity_ref = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->angular.z;
+	if(state == AGENT_CONNECTED && beat_ok==true){
+		linear_velocity_ref  = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->linear.x;
+		angular_velocity_ref = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->angular.z;
+	}
+}
+
+// pc_beat cb add by nishi 2023.3.2
+void pc_beatCallback(const void *pc_beat_msg){
+	const std_msgs__msg__UInt32 * msg = (const std_msgs__msg__UInt32 *)pc_beat_msg;
+	beat_no = msg->data;
 }
 
 bool create_entities()
@@ -918,28 +960,43 @@ bool create_entities()
 			ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
 			imu_topic_name));
 
-	// create subscriber Int32
-	//RCCHECK(rclc_subscription_init_default(
-	//  &subscriber,
-	//  &node,
-	//  ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-	//  "micro_ros_arduino_subscriber"));
+	#if defined(USE_FOX_BEAT)
+		// create publisher for "fox_beat"
+		RCCHECK_PROC("create_entities() #8 : init fox_beat_publisher",
+			rclc_publisher_init_default(
+				&fox_beat_publisher, 
+				&node,
+				//odom_type_support,
+				ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt32), 
+				fox_beat_topic_name));
+	#endif
 
 
 	// create subscriber for Twist "cmd_vel"
-	RCCHECK_PROC("create_entities() #8 : init cmd_vel_subscriber",
+	RCCHECK_PROC("create_entities() #9 : init cmd_vel_subscriber",
 		rclc_subscription_init_default(
 			&cmd_vel_subscriber,
 			&node,
 			ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
 			"cmd_vel"));
 
+	#if defined(USE_PC_BEAT)
+		// create subscriber for UInt32 "pc_beat" add by nishi 2023.3.2
+		RCCHECK_PROC("create_entities() #10 : init pc_beat_subscriber",
+			rclc_subscription_init_default(
+				&pc_beat_subscriber,
+				&node,
+				ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt32),
+				"pc_beat"));
+	#endif
+
+
 	//----------------------
 	// create timer
 	//----------------------
 
 	const unsigned int timer_timeout = 1000;
-	RCCHECK_PROC("create_entities() #9 : init timer",
+	RCCHECK_PROC("create_entities() #11 : init timer",
 		rclc_timer_init_default(
 			&timer,
 			&support,
@@ -950,12 +1007,23 @@ bool create_entities()
 	// create executor
 	//----------------------
 	//  for publisher
-	RCCHECK_PROC("create_entities() #10 : init executor",
-		rclc_executor_init(&executor, &support.context, 1, &allocator));
+	#if !defined(USE_PC_BEAT)
+		RCCHECK_PROC("create_entities() #12 : init executor",
+			rclc_executor_init(&executor, &support.context, 1, &allocator));
+	#else
+		RCCHECK_PROC("create_entities() #12 : init executor",
+			rclc_executor_init(&executor, &support.context, 2, &allocator));
+	#endif
 
 	//  for cmd_vel subscriber
-	RCCHECK_PROC("create_entities() #11 : executor_add_subscription executor",
+	RCCHECK_PROC("create_entities() #13 : executor_add_subscription executor",
 		rclc_executor_add_subscription(&executor, &cmd_vel_subscriber, &cmd_vel_msg0, &commandVelocityCallback, ON_NEW_DATA));
+
+	#if defined(USE_PC_BEAT)
+		//  for pc_beat subscriber add by nishi 2023.3.2 by nishi
+		RCCHECK_PROC("create_entities() #14 : executor_add_subscription executor",
+			rclc_executor_add_subscription(&executor, &pc_beat_subscriber, &pc_beat_msg0, &pc_beatCallback, ON_NEW_DATA));
+	#endif
 
 	return ok;
 }
@@ -969,7 +1037,16 @@ void destroy_entities()
   rc=rcl_publisher_fini(&odom_publisher, &node);
   rc=rcl_publisher_fini(&tf_publisher, &node);
   rc=rcl_publisher_fini(&imu_publisher, &node);
+
+  #if defined(USE_FOX_BEAT)
+    rc=rcl_publisher_fini(&fox_beat_publisher, &node);
+  #endif
+
   rc=rcl_subscription_fini(&cmd_vel_subscriber, &node);
+
+  #if defined(USE_PC_BEAT)
+    rc=rcl_subscription_fini(&pc_beat_subscriber, &node);	// add by nishi 2023.3.2
+  #endif
 
   rc=rcl_timer_fini(&timer);
   rclc_executor_fini(&executor);

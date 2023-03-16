@@ -20,6 +20,11 @@
 
 #define USE_FOXBOT
 
+// add by nishi 2023.3.4
+//#define USE_TRACE
+// platformio.ini
+// -D USE_TRACE
+
 // for fooxbot_core3.ino
 #if defined(USE_FOXBOT)
 	// add by nishi
@@ -182,22 +187,26 @@
 //#define SS_PIN   5
 #define BDPIN_SPI_CS_IMU 5
 
-#define SERIAL_PORT Serial
+#if defined(USE_TRACE)
+	extern HardwareSerial mySerial2;
+	#define SERIAL_PORT mySerial2
+#else
+	#define SERIAL_PORT Serial
+#endif
 
 
 // for ICM_20948.h
 #ifdef USE_SPARK_LIB
-#define USE_SPI       // Uncomment this to use SPI
-#define SERIAL_PORT Serial
+	#define USE_SPI       // Uncomment this to use SPI
 
-//#define SPI_PORT SPI // Your desired SPI port.       Used only when "USE_SPI" is defined
-//#define CS_PIN 2     // Which pin you connect CS to. Used only when "USE_SPI" is defined
-#define CS_PIN 5     // Which pin you connect CS to. Used only when "USE_SPI" is defined
+	//#define SPI_PORT SPI // Your desired SPI port.       Used only when "USE_SPI" is defined
+	//#define CS_PIN 2     // Which pin you connect CS to. Used only when "USE_SPI" is defined
+	#define CS_PIN 5     // Which pin you connect CS to. Used only when "USE_SPI" is defined
 
-#define WIRE_PORT Wire // Your desired Wire port.      Used when "USE_SPI" is not defined
-#define AD0_VAL 1      // The value of the last bit of the I2C address.                \
-                       // On the SparkFun 9DoF IMU breakout the default is 1, and when \
-                       // the ADR jumper is closed the value becomes 0
+	#define WIRE_PORT Wire // Your desired Wire port.      Used when "USE_SPI" is not defined
+	#define AD0_VAL 1      // The value of the last bit of the I2C address.                \
+						// On the SparkFun 9DoF IMU breakout the default is 1, and when \
+						// the ADR jumper is closed the value becomes 0
 #endif
 
 /** Macro for micro tesla (uT) per LSB (1 LSB = 0.1uT) */

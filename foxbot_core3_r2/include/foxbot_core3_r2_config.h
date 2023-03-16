@@ -39,6 +39,7 @@
 // add by nishi 2023.2.24
 #include <rmw_microros/rmw_microros.h>
 #include <std_msgs/msg/int32.h>
+#include <std_msgs/msg/u_int32.h>
 
 #include <geometry_msgs/msg/transform_stamped.h>
 #include <tf2_msgs/msg/tf_message.h>
@@ -50,6 +51,9 @@
 
 //#include <micro_ros_utilities/type_utilities.h>
 //#include <micro_ros_utilities/string_utilities.h>
+
+#define USE_PC_BEAT
+//#define USE_FOX_BEAT
 
 rclc_executor_t executor;
 rclc_support_t support;
@@ -113,37 +117,34 @@ static time_t time_seconds;
 
 
 /* Global parameters */
+//----- moter drive controll ----
 //#define FREQUENCY_RATE 					30 			// [ms] default 50ms
-#define FREQUENCY_RATE 						20 			// [ms] default 50ms
+//#define FREQUENCY_RATE 						20 			// [ms] default 50ms
 #define FREQUENCY_RATE_HZ 					50 			// 20[ms] -> 50[Hz]
 
-//#define FREQUENCY_ODOMETRY 				150 		// [ms] default 250ms
-// test by nishi 2021.10.9
-//#define FREQUENCY_ODOMETRY 				200 		// [ms] default 250ms
-//#define FREQUENCY_ODOMETRY 				190 		// [ms] default 250ms
-//#define FREQUENCY_ODOMETRY 				160 		// [ms] default 250ms
-
-//#define FREQUENCY_ODOMETRY_HZ             30   // 30[hz]  Act 25[hz]
-#define FREQUENCY_ODOMETRY_HZ             15.0d   // 15[hz]  Act 25[hz]
-//#define FREQUENCY_ODOMETRY_HZ               13.0d   // 13.6[hz]
-
-#define FREQUENCY_ODOMETRY 				    33 		// [ms] default 250ms
-
-#define FREQUENCY_ROSPINONCE_HZ				6		// 150[ms] -> 6.6[hz]
-#define FREQUENCY_ROSPINONCE 				150 		// [ms]
-
+//----- rate controler -----
 //#define FREQUENCY_CONTROLLER 				30 			// [ms] default 50ms
 #define FREQUENCY_CONTROLLER 				20 			// [ms] default 50ms
 #define FREQUENCY_CONTROLLER_HZ				50 			// 20[ms] -> 50[Hz]
 
+//---- odometry and tf publish rate ----
+//#define FREQUENCY_ODOMETRY_HZ             15.0d   // 15[hz]  Act ??[hz]
+#define FREQUENCY_ODOMETRY_HZ             12.0d   // 12[hz]  Act ??[hz] changed by nhishi 2023.3.3
+
+//---- ros spin rate
+//#define FREQUENCY_ROSPINONCE_HZ				50		// 50[Hz] -> 20000[us]
+#define FREQUENCY_ROSPINONCE_HZ				24		// 24[Hz]  changed by nishi 2023.3.3
+
+//---- imu publish rate -----
 //#define FREQUENCY_IMU_PUBLISH_HZ            200  // 5[ms] -> 200[hz]
-#define FREQUENCY_IMU_PUBLISH_HZ            15  // 15 [hz]
-#define FREQUENCY_IMU_PUBLISH               5           // [ms] default 5ms add by nishi 2021.7.5
+//#define FREQUENCY_IMU_PUBLISH_HZ            15  // 15 [hz]
+#define FREQUENCY_IMU_PUBLISH_HZ            12  // 12 [hz]  changed by nishi 2023.3.3
 
-#define FREQUENCY_IMU_DATA_HZ               100  // 90[hz]
-//#define FREQUENCY_IMU_DATA_HZ               200  // 90[hz]
+//---- imu data copy rate ----
+#define FREQUENCY_IMU_DATA_HZ               100  // 100[hz]
+//#define FREQUENCY_IMU_DATA_HZ               200  // 200[hz]
 
-
+//---- moter drive parameters ------
 /* Rate computing parameters */
 #define RATE_DIRECTION_MEDIAN_FILTER_SIZE 	3
 #define RATE_CONV 							0.0073882 	// [inc] -> [rad]
@@ -333,7 +334,7 @@ float q_prev[4];
 /* Velocity command subscriber */
 // callback function prototype
 void commandVelocityCallback(const void *cmd_vel_msg);
-
+void pc_beatCallback(const void *pc_beat_msg);
 
 /*******************************************************************************
 * Subscriber
@@ -342,6 +343,11 @@ void commandVelocityCallback(const void *cmd_vel_msg);
 rcl_subscription_t cmd_vel_subscriber;
 geometry_msgs__msg__Twist cmd_vel_msg0;
 
+#if defined(USE_PC_BEAT)
+    // "pc_beat"
+    rcl_subscription_t pc_beat_subscriber;
+    std_msgs__msg__UInt32 pc_beat_msg0;
+#endif
 
 /*******************************************************************************
 * Publisher
@@ -391,9 +397,10 @@ const char * odom_topic_name = "odom_fox";
     ros::Publisher mag_pub("magnetic_field", &mag_msg);
 #endif
 
-/*******************************************************************************
-* Transform Broadcaster
-*******************************************************************************/
+/*-------------------------------------------------------
+-- Transform Broadcaster
+--------------------------------------------------------*/
+
 // TF of Turtlebot3 ROS2
 rcl_publisher_t tf_publisher;
 const char * tf_topic_name = "tf";
@@ -404,6 +411,17 @@ tf2_msgs__msg__TFMessage * tf_message;  // 複数 Entry 在るので、memory �
 geometry_msgs__msg__TransformStamped odom_tf;
 
 //tf::TransformBroadcaster tf_broadcaster;
+
+/*-------------------------------------------------------
+-- fox_beat publisher   add by nishi 2023.3.6
+--------------------------------------------------------*/
+#if defined(USE_FOX_BEAT)
+    // "fox_beat"
+    std_msgs__msg__UInt32 fox_beat;
+    rcl_publisher_t fox_beat_publisher;
+    const char * fox_beat_topic_name = "fox_beat";
+#endif
+
 
 struct MOTOR_TIC{
     int32_t left;
@@ -493,9 +511,18 @@ char joint_state_header_frame_id[30];
 
 // add by nishi 2022.9.9
 // use_tf_static==true : publist tf odom -> base_footprint 
-bool use_tf_static=true;
+bool use_tf_static=false;
 
 // use_imu_pub==true : publist 'imu_fox' 
-bool use_imu_pub=false;
+bool use_imu_pub=true;
+
+// use_beat==true : Heart Beat function ON  add by nishi 2023.3.2
+// subscribe /fox_beat
+bool use_beat=true;
+u_int32_t beat_no=0;
+u_int32_t beat_no_prev=0;
+
+bool beat_ok=true;
+bool beat_ok_prev=true;
 
 #endif // FOXBOT_CORE_CONFIG_H_

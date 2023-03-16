@@ -101,7 +101,10 @@ bool cICM20948::begin()
   //pinMode(23,INPUT_PULLUP);
 
   bool initialized = false;
-  cnt = 2;
+  bConnected=false;
+  
+  //cnt = 2;
+  cnt = 4;  // changed by nishi 2023.3.4
   while (!initialized)
   {
     myICM.begin(CS_PIN, MPU_SPI);
@@ -129,8 +132,16 @@ bool cICM20948::begin()
   //spiWriteByte(ICM20948_REG_USER_CTRL, ICM20948_BIT_I2C_IF_DIS);
 
   uint8_t whoami;
-  //whoami = spiReadByte(ICM20948_REG_WHO_AM_I);
-  whoami = myICM.getWhoAmI();
+  cnt = 4;
+  while(cnt >=0){
+    //whoami = spiReadByte(ICM20948_REG_WHO_AM_I);
+    whoami = myICM.getWhoAmI();
+    // whoami = 0xEA  -> ICM20948
+    if(whoami == 0xEA)
+      break;
+    delay(500);
+    cnt--;
+  }
   // whoami = 0xEA  -> ICM20948
   //if(whoami == ICM20948_DEVICE_ID)
   if(whoami == 0xEA)
@@ -148,7 +159,7 @@ bool cICM20948::begin()
   }
   // add byy nishi
   else{
-    SERIAL_PORT.print("cICM20948::begin(): #1 ");
+    SERIAL_PORT.print("cICM20948::begin(): #1 whoami=");
     SERIAL_PORT.println(whoami, HEX);
     //while(1){
     //  delay(100);
