@@ -127,4 +127,8 @@ On Remote PC
       1) heart beat を追加。  
         /pc_beat が、Publish されている時のみ、/cmd_vel を取り込みます。  
         
+2024.4.24  
+      
+      1) ROS2 humble 版を公開しました。  
+        
       
