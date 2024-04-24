@@ -52,8 +52,18 @@
 //#include <micro_ros_utilities/type_utilities.h>
 //#include <micro_ros_utilities/string_utilities.h>
 
-#define USE_PC_BEAT
+
+//---------------------------------------------------
+// change these params for your robot contorol 1
+//
+// 1) enable whehter 'pc_beat' syncronize or not
+//#define USE_PC_BEAT
 //#define USE_FOX_BEAT
+
+// 2) use odom topic name which '/odom' or '/odom_fox'  add by nishi 2023.4.4
+#define USE_ODOM_FOX
+//----------------------------------------------------
+
 
 rclc_executor_t executor;
 rclc_support_t support;
@@ -376,7 +386,11 @@ const char * imu_topic_name = "imu";
 // Odometry of Turtlebot3 ROS2
 nav_msgs__msg__Odometry odom;
 rcl_publisher_t odom_publisher;
-const char * odom_topic_name = "odom_fox";
+#if defined(USE_ODOM_FOX)
+    const char * odom_topic_name = "odom_fox";
+#else
+    const char * odom_topic_name = "odom";
+#endif
 // type support
 //const rosidl_message_type_support_t * odom_type_support = ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry);
 
@@ -509,16 +523,23 @@ char mag_frame_id[30];
 
 char joint_state_header_frame_id[30];
 
+//----------------------------------------------
+// change these params for your robot contorol 2
+//
 // add by nishi 2022.9.9
-// use_tf_static==true : publist tf odom -> base_footprint 
+// 3) use_tf_static==true : publist tf odom -> base_footprint 
 bool use_tf_static=false;
 
-// use_imu_pub==true : publist 'imu_fox' 
+// 4) use_imu_pub==true : publist 'imu_fox' 
 bool use_imu_pub=true;
 
-// use_beat==true : Heart Beat function ON  add by nishi 2023.3.2
+// 5) use_beat==true : Heart Beat function ON  add by nishi 2023.3.2
 // subscribe /fox_beat
 bool use_beat=true;
+
+//----------------------------------------------
+
+
 u_int32_t beat_no=0;
 u_int32_t beat_no_prev=0;
 

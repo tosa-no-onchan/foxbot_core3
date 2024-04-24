@@ -33,7 +33,7 @@
 //#include "LSM9DS1.h"
 // LSM9DS.h を使わない時に、SparkFunLSM9DS1.h: No such file or directory エラーが出る場合は、
 // 下記、 インクルードを有効にして下さい。
-//#include <SparkFunLSM9DS1.h>
+#include <SparkFunLSM9DS1.h>
 // そうすると、SparkFun_LSM9DS1_Arduino_Library/src/SparkFunLSM9DS1.cpp がビルドされて、ライブラリーが作成されて、
 // コンパイルが出来ます。
 

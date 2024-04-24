@@ -14,13 +14,8 @@
 #include <Arduino.h>
 #include "IMU.h"
 
-#if defined(BOARD_ESP32)
-  //#define LED_BUILTIN 17
-  #define LED_BUILTIN 4
-#elif defined(BOARD_PICO32)
-  #define LED_BUILTIN 27
-#endif
-
+#define LED_BUILTIN 17
+//#define LED_BUILTIN 4
 
 /*---------------------------------------------------------------------------
      TITLE   : BLE
@@ -76,9 +71,7 @@ uint8_t cIMU::begin( uint32_t hz ){
 
   cali_tf=0;    // Madgwick Caliburation
 
-  #if defined(BOARD_ESP32)
-   	digitalWrite(LED_BUILTIN, LOW);		// light OFF
-  #endif
+ 	digitalWrite(LED_BUILTIN, LOW);		// light OFF
 
   for(i=0;i<4;i++){
     bConnected = SEN.begin();
@@ -105,12 +98,8 @@ uint8_t cIMU::begin( uint32_t hz ){
         if (millis()-pre_time > 5000){
           break;
         }
-        #if !defined(IMU_SENSER6)
-          delay(25);        // delay mill sec 1000 [ms]
-        #else
-          delayMicroseconds(1000);
-        #endif
-      }
+        delayMicroseconds(1000);
+     }
     #else
       while(!SEN.gyro_cali_get_done()){
         update();
@@ -122,9 +111,7 @@ uint8_t cIMU::begin( uint32_t hz ){
     #endif
   }
   else{
-    #if defined(BOARD_ESP32)
-    	digitalWrite(LED_BUILTIN, HIGH);		// light ON
-    #endif
+  	digitalWrite(LED_BUILTIN, HIGH);		// light ON
     err_code=1;
   }
 	return err_code;

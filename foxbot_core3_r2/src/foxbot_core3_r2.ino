@@ -220,10 +220,19 @@ void setup(){
 	    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
 	#endif
 
-	// Builtin LED
-	pinMode(LED_BUILTIN, OUTPUT);
-	digitalWrite(LED_BUILTIN, LOW);		// light OFF
-	//digitalWrite(LED_BUILTIN, HIGH);	// light ON
+	#if defined(BOARD_ESP32)
+		// Builtin LED
+		pinMode(LED_PIN, OUTPUT);
+		digitalWrite(LED_PIN, HIGH);  // light ON
+		delay(500);
+		digitalWrite(LED_PIN, LOW);  // light OFF
+		delay(500);
+		digitalWrite(LED_PIN, HIGH);  // light ON
+		delay(500);
+		digitalWrite(LED_PIN, LOW);  // light OFF
+		delay(500);
+	#endif
+
 
 	#if defined(ESP32)
 		Serial.begin(115200);
@@ -263,7 +272,9 @@ void setup(){
 	#endif
 
 	// start foxbot_core
-	analogWriteResolution(12);
+	//analogWriteResolution(12);
+	// changed by nishi 2024.4.24
+	analog_write::analogWriteResolution(12);
 	#if defined(ESP32)
 	    //Serial.println("analogWriteResolution(12) ok");
 	#endif
@@ -273,8 +284,12 @@ void setup(){
 
 	#if defined(BOARD_ESP32)
 		// add by nishi for ESP32 only
-		analogWriteChannel(enMotorRight);
-		analogWriteChannel(enMotorLeft);
+		//analogWriteChannel(enMotorRight);
+		// changed by nishi 2024.4.24
+		analog_write::analogWriteChannel(enMotorRight);
+		//analogWriteChannel(enMotorLeft);
+		// changed by nishi 2024.4.24
+		analog_write::analogWriteChannel(enMotorLeft);
 	#endif
 
 	// https://micro.ros.org/docs/api/rmw/
@@ -284,6 +299,50 @@ void setup(){
     set_microros_transports();
 
 	delay(2000);
+
+	//#define TEST_2
+	// IMU の単体テスト用
+	#if defined(TEST_2)
+		Serial.begin(115200);
+		Serial.println("start IMU test");
+		// test IMU start
+		for(int i=0;i<4;i++){
+			if (0==sensors.initIMU()){
+			//if (0==IMU.begin(206)){
+				sen_init=true;
+				break;
+			}
+			delay(100);        // delay mill sec 1000 [ms]
+		}
+
+		Serial.print("sen_init=");
+		Serial.print(sen_init);
+		Serial.print("\n");
+		delay(1000);        // delay mill sec 1000 [ms]
+
+		while(1){
+			//IMU.update();
+			sensors.updateIMU();
+
+			Serial.print("W:");
+			Serial.print(sensors.imu_.quat[0]);  // W
+			Serial.print(" ,X:");
+			Serial.print(sensors.imu_.quat[1]);  // X
+			Serial.print(" ,Y:");
+			Serial.print(sensors.imu_.quat[2]);  // Y
+			Serial.print(" ,Z:");
+			Serial.print(sensors.imu_.quat[3]);  // Z
+			Serial.print("\n");
+			//#if defined(IMU_SENSER6)
+				delay(2);        // 
+			//#else
+			//	//delay(30);        // delay mill sec [ms] 33 [hz] -> 
+			//	delay(29);        // delay mill sec [ms] 34.48 [hz] -> 
+			//	//delay(28);        // delay mill sec [ms] 38 [hz] -> 26 より、取れる。
+			//	//delay(26);        // delay mill sec [ms] 38 [hz] -> 途中で、取れなくなる。
+			//#endif
+		}
+	#endif
 
 	//------------------
 	// alloc TF Message
@@ -544,12 +603,15 @@ void loop() {
   }
 
   if(state != state_prv){
-	if (state == AGENT_CONNECTED) {
-	  digitalWrite(LED_BUILTIN, LOW);	// light OFF
-	} 
-	else {
-	  digitalWrite(LED_BUILTIN, HIGH);	// light ON
-	}
+	// add by nishi 2024.2.11
+	#if defined(USE_AGENT_LED)
+		if (state == AGENT_CONNECTED) {
+			digitalWrite(LED_BUILTIN, LOW);	// light OFF
+		} 
+		else {
+			digitalWrite(LED_BUILTIN, HIGH);	// light ON
+		}
+	#endif
   }
 }
 
@@ -619,7 +681,7 @@ void loop_main(){
 		//debug_left.z = angular_velocity_est * dt;
 		//debug_publisher1.publish(&debug_left);
 
-		#ifndef ODOM_USE_IMU
+		#if !defined(ODOM_USE_IMU)
 			// compute quaternion
 			q[0] = cos(abs(yaw_est) / 2.0f);		// qw
 			q[1] = 0.0f;							// qx
@@ -659,9 +721,12 @@ void loop_main(){
 			//q0 = sqrt(1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3)));    //  -- W
 			//q_tmp[0] = sqrt(1.0 - ((q_tmp[1] * q_tmp[1]) + (q_tmp[2] * q_tmp[2]) + (q_tmp[3] * q_tmp[3])));
 
-			q[0]=1.0 - ((q[1] * q[1]) + (q[2] * q[2]) + (q[3] * q[3]));
-			if(q[0] >= 0.0) q[0] = sqrt(q[0]);
-			else q[0] = sqrt(q[0] * -1.0) * -1.0;
+			// 上で、q[2] をいじったら必要です。Noramalizeする。by nishi 2022.2.20
+			#if defined(USE_Q2_adjust)
+				q[0]=1.0 - ((q[1] * q[1]) + (q[2] * q[2]) + (q[3] * q[3]));
+				if(q[0] >= 0.0) q[0] = sqrt(q[0]);
+				else q[0] = sqrt(q[0] * -1.0) * -1.0;
+			#endif
 
 
 			//sensors.imu_.compCB(q_tmp,&cb);
@@ -1194,16 +1259,23 @@ void update_motor(void *pvParameters){
 			if(sen_init==true){
 				sensors.updateIMU();
 			}
-			//                                    無負荷時  /  Madgwick時 / DMP6時  / DMP6 + Acc
-			//tTime[6] = t + 1000000UL / 100;   //    
-			//tTime[6] = t + 1000000UL / 250;   //    
-			//tTime[6] = t + 1000000UL / 400;   //        /  206        /   205     /
-			//tTime[6] = t + 1000000UL / 450;   //        /  216        /        /
-			//tTime[6] = t + 1000000UL / 600;   //    
-			tTime[6] = t + 1000000UL / 700;   //        /  263        /   300     /
-			//tTime[6] = t + 1000000UL / 950;   //        /  292        /        /
-			//tTime[6] = t + 1000000UL / 1000;  //        /  300        /   338   /  338 だけど tf が変
-			// 無制限 							 //        / 1544 - 1620 / 3700   / 1600 だけど tf が変
+			#if defined(IMU_SENSER6)
+				//                                    無負荷時  /  Madgwick時 / DMP6時  / DMP6 + Acc
+				//tTime[6] = t + 1000000UL / 100;   //    
+				//tTime[6] = t + 1000000UL / 250;   //    
+				//tTime[6] = t + 1000000UL / 400;   //        /  206        /   205     /
+				//tTime[6] = t + 1000000UL / 450;   //        /  216        /        /
+				//tTime[6] = t + 1000000UL / 600;   //    
+				tTime[6] = t + 1000000UL / 700;   //        /  263        /   300     /
+				//tTime[6] = t + 1000000UL / 950;   //        /  292        /        /
+				//tTime[6] = t + 1000000UL / 1000;  //        /  300        /   338   /  338 だけど tf が変
+				// 無制限 							 //        / 1544 - 1620 / 3700   / 1600 だけど tf が変
+			#else
+				//tTime[6] = t + 1000000UL / 60;   //    
+				//tTime[6] = t + 1000000UL / 50;   //    
+				tTime[6] = t + 1000000UL / 38;   // 38[Hz]
+				//tTime[6] = t + 1000000UL / 34;	// 34.48[Hz] 2024.4.23 setteing original
+			#endif
 			ac_cnt2++;
 		}
 
@@ -1301,7 +1373,9 @@ void setMotorRateAndDirection(int pwm_ref, const float rate_ref,
 
 		// write pwm
 		#if defined(BOARD_ESP32)
-		analogWrite(enMotor, pwm_ref,PWM_MAX);
+		//analogWrite(enMotor, pwm_ref,PWM_MAX);
+		// chnaged by nishi 2024.4.24
+		analog_write::analogWrite(enMotor, pwm_ref,PWM_MAX);
 		#else
 		analogWrite(enMotor, pwm_ref);
 		#endif
@@ -1446,7 +1520,8 @@ void updateVariable(bool isConnected)
 	      sen_init=true;
           break;
 		}
-	    delay(1000);        // delay mill sec 1000 [ms]
+	    //delay(1000);        // delay mill sec 1000 [ms]
+	    delay(500);        // delay mill sec 1000 [ms]
 	  }
 
 	  #if defined(USE_TRACE)

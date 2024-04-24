@@ -35,24 +35,24 @@
 	//#define USE_MADWICK
 
 	// add by nishi 2021.10.7
-	//#define IMU_SENSER6		// 9軸の時は、コメントにする。
+	#define IMU_SENSER6
 	//#define USE_MAG
 
 	#define USE_ACC_2G
 	//#define USE_ACC_4G
 	//#define USE_ACC_8G
 
-// for micro_ros_tf_publisher
+// for ReadIMU
 #else
 	// add by nishi
-	#define USE_SPARK_LIB
-	//#define USE_ACC_NISHI
-	//#define USE_GRYO_NISHI
-	#define USE_DMP_NISHI
-	//#define USE_MADWICK
+	//#define USE_SPARK_LIB
+	#define USE_ACC_NISHI
+	#define USE_GRYO_NISHI
+	//#define USE_DMP_NISHI
+	#define USE_MADWICK
 
 	// add by nishi 2021.10.7
-	//#define IMU_SENSER6		// 9軸の時は、コメントにする。
+	#define IMU_SENSER6
 	//#define USE_MAG
 
 	#define USE_ACC_2G
@@ -176,20 +176,16 @@
 #if defined(USE_SPARK_LIB)
 	#include <ICM_20948.h>  		// Click here to get the library: http://librarymanager/All#SparkFun_ICM_20948_IMU
 #else
-	//#include "ICM20948_spi.h"		// not use
+	#include "ICM20948_spi.h"
 #endif
 
 //#define MPU_SPI   SPI_IMU
 // changed by nishi
 #define MPU_SPI   SPI
 
-#if defined(BOARD_ESP32)
-	// add by nishi
-	//#define SS_PIN   5
-	#define BDPIN_SPI_CS_IMU 5
-#elif defined(BOARD_PICO32)
-	#define BDPIN_SPI_CS_IMU 19
-#endif
+// add by nishi
+//#define SS_PIN   5
+#define BDPIN_SPI_CS_IMU 5
 
 #if defined(USE_TRACE)
 	extern HardwareSerial mySerial2;
@@ -200,13 +196,12 @@
 
 
 // for ICM_20948.h
-#if defined(USE_SPARK_LIB)
+#ifdef USE_SPARK_LIB
 	#define USE_SPI       // Uncomment this to use SPI
 
 	//#define SPI_PORT SPI // Your desired SPI port.       Used only when "USE_SPI" is defined
 	//#define CS_PIN 2     // Which pin you connect CS to. Used only when "USE_SPI" is defined
-	//#define CS_PIN 5     // Which pin you connect CS to. Used only when "USE_SPI" is defined
-	#define CS_PIN BDPIN_SPI_CS_IMU     // Which pin you connect CS to. Used only when "USE_SPI" is defined
+	#define CS_PIN 5     // Which pin you connect CS to. Used only when "USE_SPI" is defined
 
 	#define WIRE_PORT Wire // Your desired Wire port.      Used when "USE_SPI" is not defined
 	#define AD0_VAL 1      // The value of the last bit of the I2C address.                \
@@ -291,7 +286,7 @@ public:
 	void acc_cali_start();
 	bool acc_cali_get_done();
 
-	#if defined(USE_DMP_NISHI)
+	#ifdef USE_DMP_NISHI
 		void dmp_init( void );
 		bool dmp_get_adc();
 		bool dmp_cali_get_done();
@@ -304,7 +299,7 @@ public:
 	bool mag_cali_get_done();
 
 private:
-	#if defined(USE_SPARK_LIB)
+	#ifdef USE_SPARK_LIB
 		ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
 	#else
 		cICM20948_spi _spi;

@@ -112,10 +112,6 @@ bool cICM20948::begin()
   {
     myICM.begin(CS_PIN, MPU_SPI);
 
-    // add by nisshi 2024.2.17
-    //myICM.swReset();
-    //delay(250);
-
     SERIAL_PORT.print(F("Initialization of the sensor returned: "));
     SERIAL_PORT.println(myICM.statusString());
     if (myICM.status != ICM_20948_Stat_Ok)
@@ -134,20 +130,6 @@ bool cICM20948::begin()
       initialized = true;
     }
   }
-
-  // add by nishi 2024.2.19
-  // Here we are doing a SW reset to make sure the device starts in a known state
-  // リセットしたら、再度、myICM.startupMagnetometer() が必要です。
-  myICM.swReset();
-  if (myICM.status != ICM_20948_Stat_Ok)
-  {
-    SERIAL_PORT.print(F("Software Reset returned: "));
-    SERIAL_PORT.println(myICM.statusString());
-  }
-  delay(250);
-  // Now wake the sensor up
-  myICM.sleep(false);
-  myICM.lowPower(false);
 
   // Disable I2C interface, use SPI
   //spiWriteByte(ICM20948_REG_USER_CTRL, ICM20948_BIT_I2C_IF_DIS);
@@ -292,8 +274,8 @@ bool cICM20948::init( void ){
   //delay(250);
 
   // Now wake the sensor up
-  //myICM.sleep(false);
-  //myICM.lowPower(false);
+  myICM.sleep(false);
+  myICM.lowPower(false);
 
   // Gyro and Acc を使う
   #if defined(USE_ACC_NISHI) || defined(USE_GRYO_NISHI)
@@ -453,7 +435,7 @@ bool cICM20948::init( void ){
     // Enable the DMP orientation sensor
     #if !defined(IMU_SENSER6)
       success &= (myICM.enableDMPSensor(INV_ICM20948_SENSOR_ORIENTATION) == ICM_20948_Stat_Ok);   // original  2021.11.11
-      //success &= (myICM.enableDMPSensor(INV_ICM20948_SENSOR_ROTATION_VECTOR) == ICM_20948_Stat_Ok);   // test 2 -> OK 2024.2.19
+      //success &= (myICM.enableDMPSensor(INV_ICM20948_SENSOR_ROTATION_VECTOR) == ICM_20948_Stat_Ok);   // test 2
     #else
       //success &= (myICM.enableDMPSensor(INV_ICM20948_SENSOR_GRAVITY) == ICM_20948_Stat_Ok);   // test 3
       success &= (myICM.enableDMPSensor(INV_ICM20948_SENSOR_GAME_ROTATION_VECTOR) == ICM_20948_Stat_Ok);   // test 4
@@ -469,11 +451,8 @@ bool cICM20948::init( void ){
     // Setting value can be calculated as follows:
     // Value = (DMP running rate / ODR ) - 1
     // E.g. For a 5Hz ODR rate when DMP is running at 55Hz, value = (55/5) - 1 = 10.
-    // (55/34) -1 = 0.6
-    // (55/9.16666....) -1 = 5
     #if !defined(IMU_SENSER6)
-      //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat9, 0) == ICM_20948_Stat_Ok); // Set to the maximum -> Max speed is Bad
-      success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat9, 5) == ICM_20948_Stat_Ok); // Set to the maximum    test by nishi 2024.2.19
+      success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat9, 0) == ICM_20948_Stat_Ok); // Set to the maximum
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Accel, 0) == ICM_20948_Stat_Ok); // Set to the maximum
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Gyro, 0) == ICM_20948_Stat_Ok); // Set to the maximum
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Gyro_Calibr, 0) == ICM_20948_Stat_Ok); // Set to the maximum
@@ -976,7 +955,6 @@ bool cICM20948::dmp_cali_get_done()
 
 bool cICM20948::dmp_get_adc(){
 
-  //#define TRACE_DMP1
   #if defined(TRACE_DMP1)
     SERIAL_PORT.println("dmp_get_adc() start");
   #endif
@@ -1016,7 +994,6 @@ bool cICM20948::dmp_get_adc(){
 
     #if !defined(IMU_SENSER6)
       // DMP 9 Fusion
-      // ここで、良く取れない時がある。!!
       if ((data.header & DMP_header_bitmap_Quat9) > 0) // We have asked for orientation data so we should receive Quat9
       {
 
@@ -1035,30 +1012,82 @@ bool cICM20948::dmp_get_adc(){
         double q1 = ((double)data.Quat9.Data.Q1) / 1073741824.0; // Convert to double. Divide by 2^30  -- X
         double q2 = ((double)data.Quat9.Data.Q2) / 1073741824.0; // Convert to double. Divide by 2^30  -- Y
         double q3 = ((double)data.Quat9.Data.Q3) / 1073741824.0; // Convert to double. Divide by 2^30  -- Z
-        //double q0 = sqrt(1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3)));    //  -- W    こいつが、バグとの事。
 
-        double q0=1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3));
-        if(q0 >= 0.0) q0 = sqrt(q0);
-        else q0 = sqrt(q0 * -1.0) * -1.0;
+        double q0;
+        int q0i,q1i,q2i,q3i;
 
-        // nomarize してみる。
-        // https://github.com/rawify/Quaternion.cpp
-        //Quaternion x(1, 2, 3, 4);
-        //x.normalize();
-        //sqrtf(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+        q1i =(int)round(q1*1000.0);
+        q1 = (double)q1i/ 1000.0;
 
-    	  #if defined(USE_NORMAR)
-          double iLen = 1.0 / sqrtf(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
-          q0 *= iLen;
-          q1 *= iLen;
-          q2 *= iLen;
-          q3 *= iLen;
+        q2i =(int)round(q2*1000.0);
+        q2 = (double)q2i/ 1000.0;
+
+        q3i =(int)round(q3*1000.0);
+        q3 = (double)q3i/ 1000.0;
+
+        //double q0 = sqrt(1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3)));    //  -- W 
+
+        //double bias=-0.009;
+        //q1+=bias;
+        //q2+=bias;
+        //q3+=bias;
+
+        if(f==0){
+          q0 = sqrt(1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3)));    //  -- W 
+          q0i =(int)round(q0*1000.0);
+          q[0] = (double)q0i/ 1000.0;
+          q[1]=q1;
+          q[2]=q2;
+          q[3]=q3;
+          f=1;
+        }
+        else{
+          //q[0] = q[0] - (q[1] - q1) - (q[2]-q2) - (q[3] - q3);
+          q0 = q[0] - (q[1] - q1) - (q[2]-q2) - (q[3] - q3);
+          q0i =(int)round(q0*1000.0);
+          q[0] = (double)q0i/ 1000.0;
+
+          //q[0] = q[0] - (q[1] - q1) - (q[2]-q2) + (q[3] - q3);
+          //q[0] = q[0] - (q[1] - q1) + (q[2]-q2) - (q[3] - q3);
+          //q[0] = q[0] - (q[1] - q1) + (q[2]-q2) + (q[3] - q3);
+          //q[0] = q[0] + (q[1] - q1) - (q[2]-q2) - (q[3] - q3);
+          //q[0] = q[0] + (q[1] - q1) - (q[2]-q2) + (q[3] - q3);
+          //q[0] = q[0] + (q[1] - q1) + (q[2]-q2) - (q[3] - q3);
+          //q[0] = q[0] + (q[1] - q1) + (q[2]-q2) + (q[3] - q3);
+          //q0 = q0 + q1 -q2 + q3;
+          q[1]=q1;
+          q[2]=q2;
+          q[3]=q3;
+        }
+
+        double recipNorm = invSqrt((q[0]*q[0])+ (q1 * q1) + (q2 * q2) + (q3 * q3));
+        q[0] *= recipNorm;
+        q1 *= recipNorm;
+        q2 *= recipNorm;
+        q3 *= recipNorm;
+
+        //double gmag = sqrt((q0*q0)+ (q1 * q1) + (q2 * q2) + (q3 * q3));
+
+        //if(fabs(gmag - 1.0) > 0.000001){
+        //  q0 /= gmag;
+        //  q1 /= gmag;
+        //  q2 /= gmag;
+        //  q3 /= gmag;
+        //}
+
+
+        //#define XTX1
+        #if defined(XTX1)
+          //double q0=1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3));
+          if(q0 >= 0.0) q0 = sqrt(q0);
+          else q0 = sqrt(q0 * -1.0) * -1.0;
         #endif
-
+  
+  
         //#define TEST_W0_X
         #if defined(TEST_W0_X)
           SERIAL_PORT.print(F("#5 Q0:"));
-          SERIAL_PORT.print(q0, 3);
+          SERIAL_PORT.print(q[0], 3);
           SERIAL_PORT.print(F(" Q1:"));
           SERIAL_PORT.print(q1, 3);
           SERIAL_PORT.print(F(" Q2:"));
@@ -1069,12 +1098,7 @@ bool cICM20948::dmp_get_adc(){
           SERIAL_PORT.println(data.Quat9.Data.Accuracy);
         #endif
 
-        // 1500 -> NG
-        // 1200 -> NG
-        // 1100 -> NG
-        //if(!isnan(q0) && (data.Quat9.Data.Accuracy >= 0 && data.Quat9.Data.Accuracy <= 500)){
-        if(!isnan(q0) && (data.Quat9.Data.Accuracy >= 0 && data.Quat9.Data.Accuracy <= 600)){
-        //if(!isnan(q0) && (data.Quat9.Data.Accuracy >= 0 && data.Quat9.Data.Accuracy <= 700)){
+        if(!isnan(q[0])){
 
           #if defined(TRACE_DMP1)
           SERIAL_PORT.println("dmp_get_adc() #5");
@@ -1086,7 +1110,7 @@ bool cICM20948::dmp_get_adc(){
 
 
           //#define TEST_W0_X2
-          #if defined(TRACE_DMP1)
+          #if defined(TEST_W0_X2)
             SERIAL_PORT.print(F("#6 Q1:"));
             SERIAL_PORT.print(quatRAW[1]);
             SERIAL_PORT.print(F(" Q2:"));
@@ -1118,7 +1142,7 @@ bool cICM20948::dmp_get_adc(){
                 
                 calibratingD = 0;
 
-                #if defined(TEST_W0_X3)
+                #if defined(TEST_W0_X)
                   SERIAL_PORT.print(F("#7 Q1:"));
                   SERIAL_PORT.print(quatRAW[1]);
                   SERIAL_PORT.print(F(" Q2:"));
@@ -1139,7 +1163,7 @@ bool cICM20948::dmp_get_adc(){
               //magZero[YAW] = 0;
 
               //#if defined(QUAT_ANIMATION)
-              #if defined(TEST_W0_X4)
+              #if defined(TEST_W0_X)
                 SERIAL_PORT.print(F("#8 Q1:"));
                 SERIAL_PORT.print(quatRAW[1]);
                 SERIAL_PORT.print(F(" Q2:"));
@@ -1165,15 +1189,14 @@ bool cICM20948::dmp_get_adc(){
           //quat[3] = ((double)(quatRAW[3] - quatZero[3])) / 1073741824.0; // Convert to double. Divide by 2^30  -- Z
           //quat[0] = sqrt(1.0 - ((quat[1] * quat[1]) + (quat[2] * quat[2]) + (quat[3] * quat[3])));    //  -- W
 
-          quat[0] = q0;
+          quat[0] = q[0];
           quat[1] = q1;
           quat[2] = q2;
           quat[3] = q3;
 
           rc=true;
 
-          //#if defined(QUAT_ANIMATION)
-          #if defined(TEST_W0_X5)
+          #if defined(QUAT_ANIMATION)
             SERIAL_PORT.print(F("Q0:"));
             SERIAL_PORT.print(quat[0], 3);
             SERIAL_PORT.print(F("Q1:"));
@@ -1183,21 +1206,6 @@ bool cICM20948::dmp_get_adc(){
             SERIAL_PORT.print(F(" Q3:"));
             SERIAL_PORT.print(quat[3], 3);
             SERIAL_PORT.print(F(" Accuracy:"));
-            SERIAL_PORT.println(data.Quat9.Data.Accuracy);
-          #endif
-        }
-        else{
-          //#define TEST_W0_X8
-          #if defined(TRACE_DMP1)
-            //SERIAL_PORT.print(F("#6 Q0:"));
-            //SERIAL_PORT.print(q0, 3);
-            //SERIAL_PORT.print(F(" Q1:"));
-            //SERIAL_PORT.print(q1, 3);
-            //SERIAL_PORT.print(F(" Q2:"));
-            //SERIAL_PORT.print(q2, 3);
-            //SERIAL_PORT.print(F(" Q3:"));
-            //SERIAL_PORT.print(q3, 3);
-            SERIAL_PORT.print(F(">#8 Accuracy:"));
             SERIAL_PORT.println(data.Quat9.Data.Accuracy);
           #endif
         }
@@ -1217,8 +1225,8 @@ bool cICM20948::dmp_get_adc(){
         if(!isnan(q0)){
           if(calibratingD_f == 0){
             calibratingD++;
-            if(calibratingD >= 400){
-              if(calibratingD == 400){
+            if(calibratingD >= 800){
+              if(calibratingD == 800){
                 d[1]=0;
                 d[2]=0;
                 d[3]=0;
@@ -1227,10 +1235,10 @@ bool cICM20948::dmp_get_adc(){
               d[2] += data.Quat6.Data.Q2;             // Sum up 512 readings
               d[3] += data.Quat6.Data.Q3;             // Sum up 512 readings
 
-              if(calibratingD >= 600){
-                quatZero[1] = d[1] / 600;
-                quatZero[2] = d[2] / 600;
-                quatZero[3] = d[3] / 600; 
+              if(calibratingD >= 1600){
+                quatZero[1] = d[1] / 1600;
+                quatZero[2] = d[2] / 1600;
+                quatZero[3] = d[3] / 1600; 
 
                 calibratingD_f=1;
                 calibratingD = 0;
