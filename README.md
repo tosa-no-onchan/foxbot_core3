@@ -105,7 +105,7 @@ On Remote PC
       
       $ sudo ufw disable  
       $ ros2 topic list  
-      $ ros2 run foxbot_tool heart_beat  
+      #$ ros2 run foxbot_tool heart_beat  
       $ ros2 run turtlebot3_teleop teleop_keyboard
    
 #### 10. Update    
