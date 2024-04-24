@@ -59,9 +59,10 @@ foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。
     5.2 down load micro-ROS for Arduino  
     $ git clone -b galactic https://github.com/micro-ROS/micro_ros_arduino.git  
 
-    5.2 down load ESP32_AnalogWrite  
-    $ git clone xxx
-    edit src/analogWrite.cpp and src/analogWrite.h  
+    5.2 down load Arduino ESP32_AnalogWrite  
+    find website Arduino ESP32_AnalogWrite and down load and unzip to ~/Arduino/lib-foxbot_core3_r2  
+    insert namespace{} top and bottom of source  
+    edit ESP32_AnalogWrite/src/analogWrite.cpp and src/analogWrite.h  
     namespace analog_write {  
     ...  
     }  
