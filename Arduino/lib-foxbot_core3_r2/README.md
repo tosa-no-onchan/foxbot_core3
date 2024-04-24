@@ -9,9 +9,6 @@ foxbot_core3 (ros noetic) 版を、ros2 humble 向けに改造しました。
 2. Down Load    
   $ git clone -b foxy https://github.com/tosa-no-onchan/foxbot_core3.git  
   
-3. Down Load lib-nishi3  
-   https://github.com/tosa-no-onchan/lib-nishi3/tree/foxy  
-   を参照。  
    
  
 
