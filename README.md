@@ -130,5 +130,6 @@ On Remote PC
 2024.4.24  
       
       1) ROS2 humble 版を公開しました。  
+      heart beat は、使いません。  
         
       
