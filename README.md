@@ -57,7 +57,7 @@ foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。
     $ git clone SparkFun_ICM-20948_ArduinoLibrary to here  
     
     5.2 down load micro-ROS for Arduino  
-    $ git clone -b galactic https://github.com/micro-ROS/micro_ros_arduino.git  
+    $ git clone -b humble https://github.com/micro-ROS/micro_ros_arduino.git  
 
     5.2 down load Arduino ESP32_AnalogWrite  
     find website Arduino ESP32_AnalogWrite and down load and unzip to ~/Arduino/lib-foxbot_core3_r2  
