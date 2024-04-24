@@ -1,26 +1,25 @@
 ### foxbot_core3 for ros2
-foxbot_core3 (ros noetic) 版を、ros2 galactic 向けに改造しました。 
+foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。 
 
 詳しい内容は、[こちら。](http://www.netosa.com/blog/2022/10/ros2-esp32arduino.html)  
   
 #### [開発環境]  
     
     PC  
-      Ubuntu Mate 20.04  
+      Ubuntu Mate 22.04  
       ESP32  Arduino  
       Vscode and Platformio IDE  
-      ros2 galactic  
+      ros2 humble  
       micro-ROS for Arduino  
 
 #### [動作環境]  
     
     Remote PC  
-      Ubuntu Mate 20.04  
-      ros2 galactic  
+      Ubuntu Mate 22.04  
+      ros2 humble  
     SBC  
-      Jetson Nano 2G  
-      JetPack 4.x and Ubuntu 20.04  
-      Ros2 galactic  
+      Orange Pi 5 Armibian Jummy  
+      Ros2 humble  
       micro-ROS Agent  
     SOC  
       ESP32  
@@ -59,6 +58,13 @@ foxbot_core3 (ros noetic) 版を、ros2 galactic 向けに改造しました。
     
     5.2 down load micro-ROS for Arduino  
     $ git clone -b galactic https://github.com/micro-ROS/micro_ros_arduino.git  
+
+    5.2 down load ESP32_AnalogWrite  
+    $ git clone xxx
+    edit src/analogWrite.cpp and src/analogWrite.h  
+    namespace analog_write {  
+    ...  
+    }  
 
 #### 6. Import source code to Vscode Platformio IDE project  
 start vscode  
