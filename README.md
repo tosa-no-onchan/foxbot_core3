@@ -1,7 +1,9 @@
 ### foxbot_core3 for ros2
 foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。 
 
-詳しい内容は、[こちら。](http://www.netosa.com/blog/2022/10/ros2-esp32arduino.html)  
+詳しい内容は、  
+[こちら。](http://www.netosa.com/blog/2022/10/ros2-esp32arduino.html)  
+[Turtlebot3 自作の最近のブログ記事](http://www.netosa.com/blog/cat2/ros/robot-car/)  
   
 #### [開発環境]  
     
