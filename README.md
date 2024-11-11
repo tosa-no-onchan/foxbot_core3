@@ -1,4 +1,5 @@
-### foxbot_core3 for ros2
+# foxbot_core3 for ros2
+![foxbot_core3](https://github.com/tosa-no-onchan/foxbot_core3/blob/main/image/DSC03485-base2-b.jpg)  
 foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。 
 
 詳しい内容は、  
