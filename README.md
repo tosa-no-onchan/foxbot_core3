@@ -6,6 +6,10 @@ foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。
 [ROS2 で、ESP32(Arduino) を使う。](http://www.netosa.com/blog/2022/10/ros2-esp32arduino.html)  
 [Turtlebot3 自作の最近のブログ記事](http://www.netosa.com/blog/cat2/ros/robot-car/)  
 [ROS2 Turtlebot3 自作の最近のブログ記事](http://www.netosa.com/blog/cat2/ros2/ros2-turtlebot3/)  
+
+Launch ファイルは、  
+[tosa-no-onchan/rtabmap_ros_my](https://github.com/tosa-no-onchan/rtabmap_ros_my)  
+[foxbot_nav2_oak-d_depth_gps.launch.py](https://github.com/tosa-no-onchan/rtabmap_ros_my/blob/main/launch/foxbot_nav2_oak-d_depth_gps.launch.py)  
   
 #### [開発環境]  
     
