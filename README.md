@@ -12,7 +12,7 @@ Launch ファイルは、
 [foxbot_nav2_oak-d_depth_gps.launch.py](https://github.com/tosa-no-onchan/rtabmap_ros_my/blob/main/launch/foxbot_nav2_oak-d_depth_gps.launch.py)  
 [rtabmap_oak-d_rgb_depth_gps.launch.py](https://github.com/tosa-no-onchan/rtabmap_ros_my/blob/main/launch/rtabmap_oak-d_rgb_depth_gps.launch.py)  
 
-Host PC or SBC Control プログラムは、  
+Host SBC Control プログラムは、  
 [turtlebot3_navi_my for Ros2 humble r6](https://github.com/tosa-no-onchan/turtlebot3_navi_my)  
 
   
