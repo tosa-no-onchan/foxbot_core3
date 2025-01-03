@@ -30,7 +30,7 @@ Host SBC Control プログラムは、
     Remote PC  
       Ubuntu Mate 22.04  
       ros2 humble  
-    SBC  
+    Host SBC  
       Orange Pi 5 Armibian Jummy  
       Ros2 humble  
       micro-ROS Agent  
