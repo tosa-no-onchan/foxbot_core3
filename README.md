@@ -11,13 +11,18 @@ foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。
 [Turtlebot3 自作の最近のブログ記事](http://www.netosa.com/blog/cat2/ros/robot-car/)  
 [ROS2 Turtlebot3 自作の最近のブログ記事](http://www.netosa.com/blog/cat2/ros2/ros2-turtlebot3/)  
 
-Launch ファイルは、  
-[tosa-no-onchan/rtabmap_ros_my](https://github.com/tosa-no-onchan/rtabmap_ros_my)  
-[foxbot_nav2_oak-d_depth_gps.launch.py](https://github.com/tosa-no-onchan/rtabmap_ros_my/blob/main/launch/foxbot_nav2_oak-d_depth_gps.launch.py)  
-[rtabmap_oak-d_rgb_depth_gps.launch.py](https://github.com/tosa-no-onchan/rtabmap_ros_my/blob/main/launch/rtabmap_oak-d_rgb_depth_gps.launch.py)  
-
 Host SBC Control プログラムは、  
 [turtlebot3_navi_my for Ros2 humble r6](https://github.com/tosa-no-onchan/turtlebot3_navi_my)  
+
+Launch ファイルは、  
+[tosa-no-onchan/rtabmap_ros_my](https://github.com/tosa-no-onchan/rtabmap_ros_my)  
+  
+Static Map Navigation  
+[foxbot_nav2_oak-d_depth_gps.launch.py](https://github.com/tosa-no-onchan/rtabmap_ros_my/blob/main/launch/foxbot_nav2_oak-d_depth_gps.launch.py)  
+  
+Active Slam  
+[rtabmap_oak-d_rgb_depth_gps.launch.py](https://github.com/tosa-no-onchan/rtabmap_ros_my/blob/main/launch/rtabmap_oak-d_rgb_depth_gps.launch.py)  
+
 
   
 #### [開発環境]  
