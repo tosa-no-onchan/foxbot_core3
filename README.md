@@ -121,6 +121,9 @@ On Remote PC
       $ ros2 topic list  
       #$ ros2 run foxbot_tool heart_beat  
       $ ros2 run turtlebot3_teleop teleop_keyboard
+
+C++ programable robot control  
+[turtlebot3_navi_my](https://github.com/tosa-no-onchan/turtlebot3_navi_my)        
    
 #### 10. Update    
 2023.2.28  
