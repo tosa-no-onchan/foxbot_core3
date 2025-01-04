@@ -2,7 +2,7 @@
 ![foxbot_core3](https://github.com/tosa-no-onchan/foxbot_core3/blob/main/image/DSC03485-base2-b.jpg)  
 自作 Turtlebot SOC プログラムです。  
 ESP32 で、モーター駆動、IMU のデータ取り込みと、Host SBC への転送をおこないます。  
-Host SBC との通信は、Orange Pi 5 Serial で、micro-ROS for Arduino を利用します。  
+Host SBC との通信は、Esp32 Serial - Orange Pi 5 Serial で、micro-ROS for Arduino を利用します。  
 
 foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。 
 
