@@ -1,5 +1,7 @@
-# foxbot_core3 for ros2
+# foxbot_core3 for ros2  
 ![foxbot_core3](https://github.com/tosa-no-onchan/foxbot_core3/blob/main/image/DSC03485-base2-b.jpg)  
+自作 Turtlebot SOC プログラムです。  
+ESP32 で、モーター駆動、IMU のデータ取り込みと、Host SBC への送信をおこないます。  
 foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。 
 
 詳しい内容は、  
