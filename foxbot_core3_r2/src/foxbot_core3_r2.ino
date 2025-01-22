@@ -1272,8 +1272,8 @@ void update_motor(void *pvParameters){
 				// 無制限 							 //        / 1544 - 1620 / 3700   / 1600 だけど tf が変
 			#else
 				//tTime[6] = t + 1000000UL / 60;   //    
-				//tTime[6] = t + 1000000UL / 50;   //    
-				tTime[6] = t + 1000000UL / 38;   // 38[Hz]
+				tTime[6] = t + 1000000UL / 50;   //  こちらにしてみる。 by nishi 2025.1.19  -> NGか!
+				//tTime[6] = t + 1000000UL / 38;   // 38[Hz]  2025.1.19 以前の設定。
 				//tTime[6] = t + 1000000UL / 34;	// 34.48[Hz] 2024.4.23 setteing original
 			#endif
 			ac_cnt2++;

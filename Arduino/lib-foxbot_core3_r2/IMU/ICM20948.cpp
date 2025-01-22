@@ -473,7 +473,13 @@ bool cICM20948::init( void ){
     // (55/9.16666....) -1 = 5
     #if !defined(IMU_SENSER6)
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat9, 0) == ICM_20948_Stat_Ok); // Set to the maximum -> Max speed is Bad
-      success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat9, 5) == ICM_20948_Stat_Ok); // Set to the maximum    test by nishi 2024.2.19
+      //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat9, 5) == ICM_20948_Stat_Ok); // Set to the maximum    test by nishi 2024.2.19
+      // test by nishi 2025.1.15
+      // (55/50) -1 = 1.1 - 1 = 0.1  -> NG
+      //                  0.6 -> NG
+      //                  5 -> これ迄の設定値
+      //                  2   ->  Good!
+      success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat9, 2) == ICM_20948_Stat_Ok); // Set to the maximum    test by nishi 2025.1.19
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Accel, 0) == ICM_20948_Stat_Ok); // Set to the maximum
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Gyro, 0) == ICM_20948_Stat_Ok); // Set to the maximum
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Gyro_Calibr, 0) == ICM_20948_Stat_Ok); // Set to the maximum
