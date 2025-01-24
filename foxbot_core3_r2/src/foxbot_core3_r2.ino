@@ -884,6 +884,11 @@ void loop_main(){
 		#ifdef USE_MAG
 		    publishMagMsg();
 		#endif
+
+		#if defined(USE_DEBUG)
+			RCSOFTCHECK_PROC("loop_main() :#3 debug_left_publish",rcl_publish(&debug_left_publisher, &debug_left, NULL));
+		#endif
+
 	    tTime[3] = t + (1000000UL / FREQUENCY_IMU_PUBLISH_HZ);
 		//t = millis();		// comment in by nishi 2022.3.18
 	}
@@ -1036,6 +1041,16 @@ bool create_entities()
 				fox_beat_topic_name));
 	#endif
 
+	#if defined(USE_DEBUG)
+		// create publisher for "debug_left"
+		RCCHECK_PROC("create_entities() #9 : init debug_left_publisher",
+			rclc_publisher_init_best_effort(
+				&debug_left_publisher, 
+				&node,
+				//odom_type_support,
+				ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt32), 
+				debug_left_topic_name));
+	#endif
 
 	// create subscriber for Twist "cmd_vel"
 	RCCHECK_PROC("create_entities() #9 : init cmd_vel_subscriber",
@@ -1105,6 +1120,10 @@ void destroy_entities()
 
   #if defined(USE_FOX_BEAT)
     rc=rcl_publisher_fini(&fox_beat_publisher, &node);
+  #endif
+
+  #if defined(USE_DEBUG)
+    rc=rcl_publisher_fini(&debug_left_publisher, &node);
   #endif
 
   rc=rcl_subscription_fini(&cmd_vel_subscriber, &node);
@@ -1262,19 +1281,22 @@ void update_motor(void *pvParameters){
 			#if defined(IMU_SENSER6)
 				//                                    無負荷時  /  Madgwick時 / DMP6時  / DMP6 + Acc
 				//tTime[6] = t + 1000000UL / 100;   //    
-				//tTime[6] = t + 1000000UL / 250;   //    
+				tTime[6] = t + 1000000UL / 250;   //    
 				//tTime[6] = t + 1000000UL / 400;   //        /  206        /   205     /
 				//tTime[6] = t + 1000000UL / 450;   //        /  216        /        /
 				//tTime[6] = t + 1000000UL / 600;   //    
-				tTime[6] = t + 1000000UL / 700;   //        /  263        /   300     /
+				//tTime[6] = t + 1000000UL / 700;   //        /  263        /   300     /  2025.1.22 迄の設定
 				//tTime[6] = t + 1000000UL / 950;   //        /  292        /        /
 				//tTime[6] = t + 1000000UL / 1000;  //        /  300        /   338   /  338 だけど tf が変
 				// 無制限 							 //        / 1544 - 1620 / 3700   / 1600 だけど tf が変
 			#else
-				//tTime[6] = t + 1000000UL / 60;   //    
-				tTime[6] = t + 1000000UL / 50;   //  こちらにしてみる。 by nishi 2025.1.19  -> NGか!
+				tTime[6] = t + 1000000UL / 63;   //  実測 -> 54[hz]
+				//tTime[6] = t + 1000000UL / 60;   //  実測 -> 53[hz]
+				//tTime[6] = t + 1000000UL / 55;   //  実測 -> 50[hz]こちらにしてみる。 by nishi 2025.1.24
 				//tTime[6] = t + 1000000UL / 38;   // 38[Hz]  2025.1.19 以前の設定。
 				//tTime[6] = t + 1000000UL / 34;	// 34.48[Hz] 2024.4.23 setteing original
+				//tTime[6] = t + 1000000UL / 30;	// 34.48[Hz] 2024.4.23 setteing original
+				//tTime[6] = t + 1000000UL / 27;	// 27[Hz] 2024.4.23 setteing original
 			#endif
 			ac_cnt2++;
 		}
@@ -1289,6 +1311,17 @@ void update_motor(void *pvParameters){
 				SERIAL_PORT.println(hz, 4);
 				t_start2=clock();
 				ac_cnt2=0;
+			}
+		#endif
+
+		#if defined(USE_DEBUG)
+		  if (t >= tTime[9]){
+				//SERIAL_PORT.print(F("acc_hz:"));
+				//SERIAL_PORT.println(hz, 4);
+				float hz = (float)ac_cnt2/4;
+				debug_left.data = (int32_t)hz;
+				ac_cnt2=0;
+				tTime[9] = t + 1000000UL * 4;   // 4[sec]
 			}
 		#endif
 

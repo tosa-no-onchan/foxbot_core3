@@ -62,8 +62,11 @@
 
 // 2) use odom topic name which '/odom' or '/odom_fox'  add by nishi 2023.4.4
 #define USE_ODOM_FOX
-//----------------------------------------------------
 
+// 3) Debug
+#define USE_DEBUG
+
+//----------------------------------------------------
 
 rclc_executor_t executor;
 rclc_support_t support;
@@ -453,13 +456,19 @@ bool sen_init=false;
 
 
 /* DEBUG */
-//#include <geometry_msgs/Point.h>
-//geometry_msgs::Point debug_left;
-//ros::Publisher debug_publisher1("debug_left", &debug_left);
+#if defined(USE_DEBUG)
+    //#include <geometry_msgs/msg/point.h>
+    //geometry_msgs::Point debug_left;
+    //ros::Publisher debug_publisher1("debug_left", &debug_left);
 
-//#include <geometry_msgs/Point.h>
-//geometry_msgs::Point debug_right;
-//ros::Publisher debug_publisher2("debug_right", &debug_right);
+    std_msgs__msg__UInt32 debug_left;
+    rcl_publisher_t debug_left_publisher;
+    const char * debug_left_topic_name = "debug_left";
+
+    //#include <geometry_msgs/Point.h>
+    //geometry_msgs::Point debug_right;
+    //ros::Publisher debug_publisher2("debug_right", &debug_right);
+#endif
 
 template <typename type>
 type sign(type value) {
