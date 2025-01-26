@@ -161,6 +161,7 @@ C++ programable robot control
       
       1) update_motor() と loop_main() 間での、sensors.copyIMU() 実行時の  
       排他制御 を、portMUX_TYPE mutex に変更しました。  
+      こうちらのほうが、latency が無くて、快適です。   
 
 ``````
 portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
