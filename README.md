@@ -156,5 +156,15 @@ C++ programable robot control
       
       1) ROS2 humble 版を公開しました。  
       heart beat は、使いません。  
-        
+
+2025.1.26  
       
+      1) update_motor() と loop_main() 間での、sensors.copyIMU() 実行時の  
+      排他制御 を、portMUX_TYPE mutex に変更しました。  
+
+``````
+portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
+portENTER_CRITICAL(&mutex);
+sensors.copyIMU();
+portEXIT_CRITICAL(&mutex);
+``````
