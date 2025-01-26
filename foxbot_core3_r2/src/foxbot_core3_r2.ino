@@ -76,7 +76,8 @@
 
 // Multi task
 TaskHandle_t th[2];
-SemaphoreHandle_t xMutex = NULL;
+// https://lang-ship.com/blog/work/esp32-freertos-l06-semaphore-mutex/
+portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 
 int cnt4=0;
 
@@ -402,20 +403,9 @@ void setup(){
 	//Serial.println("setup end");
 	delay(100);
 
-	vSemaphoreCreateBinary( xMutex );
-	//xMutex = xSemaphoreCreateMutex();
-
-	if( xMutex != NULL ){
-		// start IMU Update Task. add by nishi 2021.8.9
-		xTaskCreatePinnedToCore(
-			update_motor,"update_motor",4096,NULL,1,&th[0],1);
-	}
-	else {
-		while(1){
-			Serial.println("rtos mutex create error, stopped");
-			delay(1000);
-		}
-	}
+	// start IMU Update Task. add by nishi 2021.8.9
+	xTaskCreatePinnedToCore(
+		update_motor,"update_motor",4096,NULL,1,&th[0],1);
 
 	q_prev[0]=1.0;
 	q_prev[1]=0.0;
@@ -638,7 +628,6 @@ void loop_main(){
 	}
 	tv.tv_nsec = ms*1000*1000;	// epoch nano sec
 
-
 	// Start Gyro Calibration after ROS connection  add by nishi 2021.11.3
 	//updateGyroCali(nh.connected());
 
@@ -689,19 +678,26 @@ void loop_main(){
 			q[3] = sign(yaw_est) * sin(abs(yaw_est) / 2.0f);	// gz
 		#else
 			bool ok =true;
-			if(pdTRUE == xSemaphoreTake(xMutex, 10UL)){
-				ok=false;
+			if(sen_init==true){
+				portENTER_CRITICAL(&mutex);
+				// get IMU data
+				imu_msg = sensors.getIMU();
+				portEXIT_CRITICAL(&mutex);
+
+				q[0] = imu_msg.orientation.w;
+				q[1] = imu_msg.orientation.x;
+				//q[2] = imu_msg.orientation.y - 0.013;	// ロボットの前傾を調整。 adjust verical angle IMU
+				q[2] = imu_msg.orientation.y;	// ロボットの前傾 そのまま。 2022.10.28
+				q[3] = imu_msg.orientation.z;
 			}
-			// get IMU data
-			imu_msg = sensors.getIMU();
-			if(ok){
-				xSemaphoreGive(xMutex);
+			// add by nishi 2025.1.25
+			else{
+				// compute quaternion by moter
+				q[0] = cos(abs(yaw_est) / 2.0f);		// qw
+				q[1] = 0.0f;							// qx
+				q[2] = 0.0f;							// qy
+				q[3] = sign(yaw_est) * sin(abs(yaw_est) / 2.0f);	// gz
 			}
-			q[0] = imu_msg.orientation.w;
-			q[1] = imu_msg.orientation.x;
-			//q[2] = imu_msg.orientation.y - 0.013;	// ロボットの前傾を調整。 adjust verical angle IMU
-			q[2] = imu_msg.orientation.y;	// ロボットの前傾 そのまま。 2022.10.28
-			q[3] = imu_msg.orientation.z;
 
 			//SERIAL_PORT.print(F("q[0]:"));
 			//SERIAL_PORT.print(q[0], 3);
@@ -712,7 +708,7 @@ void loop_main(){
 			//SERIAL_PORT.print(F(" q[3]:"));
 			//SERIAL_PORT.println(q[3], 3);
 
-
+			// x,y 軸の距離を補正する。
 			// 1つ前のとの 4:6 のクォータニオンをつかいます。
 			//q_tmp[1] = (float)(q[1]*0.3 + q_prev[1]*0.7);
 			//q_tmp[2] = (float)(q[2]*0.3 + q_prev[2]*0.7);
@@ -728,7 +724,6 @@ void loop_main(){
 				else q[0] = sqrt(q[0] * -1.0) * -1.0;
 			#endif
 
-
 			//sensors.imu_.compCB(q_tmp,&cb);
 			sensors.imu_.compCBd(q,&cb);
 
@@ -739,21 +734,21 @@ void loop_main(){
 			double dx1,dy1,dz1;
 
 			#if defined(TEST_10_x3)
-			cnt4++;
-			if (cnt4==0)
-				linear_velocity_est=0.0;
-			else if(cnt4==1)
-				linear_velocity_est=0.005;
-			else if(cnt4==2)
-				linear_velocity_est=0.002;
-			else if(cnt4==3)
-				linear_velocity_est=-0.002;
-			else if(cnt4==4)
-				linear_velocity_est=0.0;
-			else{
-				linear_velocity_est=-0.005;
-				cnt4=0;
-			}
+				cnt4++;
+				if (cnt4==0)
+					linear_velocity_est=0.0;
+				else if(cnt4==1)
+					linear_velocity_est=0.005;
+				else if(cnt4==2)
+					linear_velocity_est=0.002;
+				else if(cnt4==3)
+					linear_velocity_est=-0.002;
+				else if(cnt4==4)
+					linear_velocity_est=0.0;
+				else{
+					linear_velocity_est=-0.005;
+					cnt4=0;
+				}
 			#endif
 
 			dx1 = linear_velocity_est * dt;
@@ -763,7 +758,6 @@ void loop_main(){
 			dlt[0]=cb.dt[0][0]*dx1+cb.dt[0][1]*dy1+cb.dt[0][2]*dz1;
 			dlt[1]=cb.dt[1][0]*dx1+cb.dt[1][1]*dy1+cb.dt[1][2]*dz1;
 			dlt[2]=cb.dt[2][0]*dx1+cb.dt[2][1]*dy1+cb.dt[2][2]*dz1;
-
 
 			dx = dlt[0];
 			dy = dlt[1];
@@ -775,14 +769,13 @@ void loop_main(){
 
 			//#define TEST_10_x
 			#if defined(TEST_10_x)
-			SERIAL_PORT.print(F("dx:"));
-			SERIAL_PORT.print(dx, 6);
-			SERIAL_PORT.print(F(" dy:"));
-			SERIAL_PORT.print(dy, 6);
-			SERIAL_PORT.print(F(" dz:"));
-			SERIAL_PORT.println(dz, 6);
+				SERIAL_PORT.print(F("dx:"));
+				SERIAL_PORT.print(dx, 6);
+				SERIAL_PORT.print(F(" dy:"));
+				SERIAL_PORT.print(dy, 6);
+				SERIAL_PORT.print(F(" dz:"));
+				SERIAL_PORT.println(dz, 6);
 			#endif
-
 		#endif
 
 		// feed odom message
@@ -862,7 +855,6 @@ void loop_main(){
 		//Serial.print("motor_tic.right=");
 		//Serial.print(motor_tic.right, DEC);
 		//Serial.println("");
-
 
 		tTime[2] = t + frequency_odometry_hz;	// set 1-cycle-time [ms] to odom Timer.
 
@@ -1139,7 +1131,6 @@ void destroy_entities()
 }
 
 void update_motor(void *pvParameters){
-	xSemaphoreGive(xMutex);
 
 	int ac_cnt2=0;
 	clock_t t_start2 ,t_end2;
@@ -1150,11 +1141,8 @@ void update_motor(void *pvParameters){
 		foxbot3::usec_t t = foxbot3::micros_();	// update by nishi 2022.10.28
 
 		// rate computation
-		//if(_frequency_rate.delay(millis())) {
 		if (t >= tTime[0]){
-
 			//digitalWrite(RT_PIN0, HIGH);
-
 			//float dt;
 			double dt;
 
@@ -1217,7 +1205,6 @@ void update_motor(void *pvParameters){
 		}
 
 		// rate controler
-		//if(_frequency_controller.delay(millis())) {
 		if (t >= tTime[1]){
 			//digitalWrite(RT_PIN1, HIGH);
 
@@ -1258,25 +1245,27 @@ void update_motor(void *pvParameters){
 			t = foxbot3::micros_();		// add by nishi 2022.3.18
 		}
 
-		if (t >= tTime[4]){
-			//Serial.println("start update_imu()");
-			// Update the IMU unit.	add by nishi 2021.8.9
-			//sensors.updateIMU();
-			if(sen_init==true){
-				bool ok =true;
-				if(pdTRUE != xSemaphoreTake(xMutex,10UL)){
-					ok=false;
-				}
-				sensors.copyIMU();
-				if(ok){
-					xSemaphoreGive(xMutex);
-				}
-			}
-			tTime[4] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);
-		}
+		//if (t >= tTime[4]){
+		//	//Serial.println("start update_imu()");
+		//	// Update the IMU unit.	add by nishi 2021.8.9
+		//	//sensors.updateIMU();
+		//	if(sen_init==true){
+		//		bool ok =true;
+		//		portENTER_CRITICAL(&mutex);
+		//		sensors.copyIMU();
+		//		portEXIT_CRITICAL(&mutex);
+		//	}
+		//	tTime[4] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);
+		//}
+
 	    if (t >= tTime[6]){
+			//Serial.println("start update_imu()");
 			if(sen_init==true){
+				// Update the IMU unit.	add by nishi 2021.8.9
 				sensors.updateIMU();
+				portENTER_CRITICAL(&mutex);
+				sensors.copyIMU();
+				portEXIT_CRITICAL(&mutex);
 			}
 			#if defined(IMU_SENSER6)
 				//                                    無負荷時  /  Madgwick時 / DMP6時  / DMP6 + Acc
@@ -1290,13 +1279,9 @@ void update_motor(void *pvParameters){
 				//tTime[6] = t + 1000000UL / 1000;  //        /  300        /   338   /  338 だけど tf が変
 				// 無制限 							 //        / 1544 - 1620 / 3700   / 1600 だけど tf が変
 			#else
-				tTime[6] = t + 1000000UL / 63;   //  実測 -> 54[hz]
-				//tTime[6] = t + 1000000UL / 60;   //  実測 -> 53[hz]
-				//tTime[6] = t + 1000000UL / 55;   //  実測 -> 50[hz]こちらにしてみる。 by nishi 2025.1.24
+				//tTime[6] = t + 1000000UL / 63;   //  実測 -> 62[hz]
+				tTime[6] = t + 1000000UL / 55;   //  実測 -> 54[hz]こちらにしてみる。 by nishi 2025.1.24
 				//tTime[6] = t + 1000000UL / 38;   // 38[Hz]  2025.1.19 以前の設定。
-				//tTime[6] = t + 1000000UL / 34;	// 34.48[Hz] 2024.4.23 setteing original
-				//tTime[6] = t + 1000000UL / 30;	// 34.48[Hz] 2024.4.23 setteing original
-				//tTime[6] = t + 1000000UL / 27;	// 27[Hz] 2024.4.23 setteing original
 			#endif
 			ac_cnt2++;
 		}
