@@ -29,20 +29,20 @@ Active Slam
 #### [開発環境]  
     
     PC  
-      Ubuntu Mate 22.04  
+      Ubuntu Mate 22.04 and 24.04  
       ESP32  Arduino  
       Vscode and Platformio IDE  
-      ros2 humble  
+      ros2 humble and jazzy  
       micro-ROS for Arduino  
 
 #### [動作環境]  
     
     Remote PC  
-      Ubuntu Mate 22.04  
-      ros2 humble  
+      Ubuntu Mate 22.04 and 24.04  
+      ros2 humble,jazzy  
     Host SBC  
       Orange Pi 5 Armibian Jummy  
-      Ros2 humble  
+      Ros2 humble and jazzy  
       micro-ROS Agent  
     SOC  
       ESP32  
