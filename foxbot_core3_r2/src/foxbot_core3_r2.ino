@@ -72,6 +72,7 @@
 //#define ROS2_FOXY
 #define ROS2_GALACTIC
 
+// changed by nishi 2025.3.7
 #define ODOM_USE_IMU
 
 // Multi task
@@ -321,27 +322,38 @@ void setup(){
 		Serial.print("\n");
 		delay(1000);        // delay mill sec 1000 [ms]
 
-		while(1){
-			//IMU.update();
-			sensors.updateIMU();
+		bool wait_f=true;
+		int waint_cnt = 5;
 
-			Serial.print("W:");
-			Serial.print(sensors.imu_.quat[0]);  // W
-			Serial.print(" ,X:");
-			Serial.print(sensors.imu_.quat[1]);  // X
-			Serial.print(" ,Y:");
-			Serial.print(sensors.imu_.quat[2]);  // Y
-			Serial.print(" ,Z:");
-			Serial.print(sensors.imu_.quat[3]);  // Z
-			Serial.print("\n");
-			//#if defined(IMU_SENSER6)
-				delay(2);        // 
-			//#else
-			//	//delay(30);        // delay mill sec [ms] 33 [hz] -> 
-			//	delay(29);        // delay mill sec [ms] 34.48 [hz] -> 
-			//	//delay(28);        // delay mill sec [ms] 38 [hz] -> 26 より、取れる。
-			//	//delay(26);        // delay mill sec [ms] 38 [hz] -> 途中で、取れなくなる。
-			//#endif
+		while(1){
+			if(sen_init==true){
+				//IMU.update();
+				sensors.updateIMU();
+
+				Serial.print("W:");
+				Serial.print(sensors.cimu_.quat[0]);  // W
+				Serial.print(" ,X:");
+				Serial.print(sensors.cimu_.quat[1]);  // X
+				Serial.print(" ,Y:");
+				Serial.print(sensors.cimu_.quat[2]);  // Y
+				Serial.print(" ,Z:");
+				Serial.print(sensors.cimu_.quat[3]);  // Z
+				Serial.print("\n");
+				if(wait_f==true){
+					if(waint_cnt<=0)
+						while(1) delay(1000);        //
+					else
+						waint_cnt--;
+				}
+			}
+			#if defined(IMU_SENSER6)
+				delay(30);        // 
+			#else
+				//delay(30);        // delay mill sec [ms] 33 [hz] -> 
+				delay(29);        // delay mill sec [ms] 34.48 [hz] -> 
+				//delay(28);        // delay mill sec [ms] 38 [hz] -> 26 より、取れる。
+				//delay(26);        // delay mill sec [ms] 38 [hz] -> 途中で、取れなくなる。
+			#endif
 		}
 	#endif
 
@@ -724,8 +736,8 @@ void loop_main(){
 				else q[0] = sqrt(q[0] * -1.0) * -1.0;
 			#endif
 
-			//sensors.imu_.compCB(q_tmp,&cb);
-			sensors.imu_.compCBd(q,&cb);
+			//sensors.cimu_.compCB(q_tmp,&cb);
+			sensors.cimu_.compCBd(q,&cb);
 
 			//q_prev[0]=q[0];
 			//q_prev[1]=q[1];
@@ -1261,16 +1273,20 @@ void update_motor(void *pvParameters){
 	    if (t >= tTime[6]){
 			//Serial.println("start update_imu()");
 			if(sen_init==true){
-				// Update the IMU unit.	add by nishi 2021.8.9
-				sensors.updateIMU();
-				portENTER_CRITICAL(&mutex);
-				sensors.copyIMU();
-				portEXIT_CRITICAL(&mutex);
+				// changed by nishi 2025.3.7
+				if(sensors.updateIMU()==true){
+					// dmp9 で、どれくらい成功しているか、カウントする?
+					ac_cnt2++;
+					portENTER_CRITICAL(&mutex);
+					sensors.copyIMU();
+					portEXIT_CRITICAL(&mutex);
+				}
 			}
 			#if defined(IMU_SENSER6)
 				//                                    無負荷時  /  Madgwick時 / DMP6時  / DMP6 + Acc
+				tTime[6] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);	// 実測 99[Hz]	有効実測 55[Hz] changed by nishi 2025.1.26
 				//tTime[6] = t + 1000000UL / 100;   //    
-				tTime[6] = t + 1000000UL / 250;   //    
+				//tTime[6] = t + 1000000UL / 250;   //    
 				//tTime[6] = t + 1000000UL / 400;   //        /  206        /   205     /
 				//tTime[6] = t + 1000000UL / 450;   //        /  216        /        /
 				//tTime[6] = t + 1000000UL / 600;   //    
@@ -1280,10 +1296,12 @@ void update_motor(void *pvParameters){
 				// 無制限 							 //        / 1544 - 1620 / 3700   / 1600 だけど tf が変
 			#else
 				//tTime[6] = t + 1000000UL / 63;   //  実測 -> 62[hz]
-				tTime[6] = t + 1000000UL / 55;   //  実測 -> 54[hz]こちらにしてみる。 by nishi 2025.1.24
+				//tTime[6] = t + 1000000UL / 55;   //  実測 -> 54[hz]こちらにしてみる。 有効、実測 28[Hz] by nishi 2025.1.24
+				tTime[6] = t + 1000000UL / 30;   //  こちらにしてみる。 有効、実測 28[Hz] by nishi 2025.3.12
 				//tTime[6] = t + 1000000UL / 38;   // 38[Hz]  2025.1.19 以前の設定。
 			#endif
-			ac_cnt2++;
+			// changed by nishi 2025.3.7
+			//ac_cnt2++;
 		}
 
 		//#define XXX_400
@@ -1475,15 +1493,19 @@ void updateGyroCali(bool isConnected)
 *******************************************************************************/
 void publishImuMsg(void)
 {
-  imu_msg = sensors.getIMU();
+	// add by nishi 2025.3.9
+	portENTER_CRITICAL(&mutex);
+	imu_msg = sensors.getIMU();
+	// add by nishi 2025.3.9
+	portEXIT_CRITICAL(&mutex);
 
-  imu_msg.header.stamp    = rosNow();		// Now dummy
-  imu_msg.header.frame_id.data = imu_frame_id;
-  imu_msg.header.frame_id.size = strlen(imu_frame_id);
-  imu_msg.header.frame_id.capacity = sizeof(imu_frame_id);
+	imu_msg.header.stamp    = rosNow();		// Now dummy
+	imu_msg.header.frame_id.data = imu_frame_id;
+	imu_msg.header.frame_id.size = strlen(imu_frame_id);
+	imu_msg.header.frame_id.capacity = sizeof(imu_frame_id);
 
-  //imu_pub.publish(&imu_msg);
-  RCSOFTCHECK_PROC("publishImuMsg(): #1 imu_publish",rcl_publish(&imu_publisher, &imu_msg, NULL));
+	//imu_pub.publish(&imu_msg);
+	RCSOFTCHECK_PROC("publishImuMsg(): #1 imu_publish",rcl_publish(&imu_publisher, &imu_msg, NULL));
 
 }
 
@@ -1545,6 +1567,15 @@ void updateVariable(bool isConnected)
 	  #if defined(USE_TRACE)
 	  	if(sen_init==true){
 	    	mySerial2.println("sensors.initIMU(): OK");
+            //mySerial2.print(F("#6 Q0:"));
+            //mySerial2.print(q0, 3);
+            //mySerial2.print(F(" Q1:"));
+            //mySerial2.print(q1, 3);
+            //mySerial2.print(F(" Q2:"));
+            //mySerial2.print(q2, 3);
+            //mySerial2.print(F(" Q3:"));
+            //mySerial2.print(q3, 3);
+
 		}
 		else{
 	    	mySerial2.println("sensors.initIMU(): NG");

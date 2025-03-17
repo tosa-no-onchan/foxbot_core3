@@ -25,5 +25,7 @@ inline uint64_t micros_(){
     return ((uint64_t)millis()) * 1000 + ((uint64_t)micros())%1000;
 }
 
+void Kakezan(double *left, double *right,double *ans);
+
 }
 #endif

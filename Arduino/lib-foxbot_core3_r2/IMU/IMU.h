@@ -108,7 +108,9 @@ public:
 	//uint8_t  begin( uint32_t hz = 100 );
 	//uint8_t  begin( uint32_t hz = 400 );
 	uint8_t  begin( uint32_t hz = 800 );
-	uint16_t update( uint32_t option = 0 );
+	//uint16_t update( uint32_t option = 0 );
+  // changed by nishi 2025.3.7
+	bool update( uint32_t option = 0 );
 
   void QuaternionToEulerAngles(double q0, double q1, double q2, double q3,
                              double& roll, double& pitch, double& yaw);
@@ -132,7 +134,9 @@ private:
 
   unsigned long tTime[3];
 
-	void computeIMU( void );
+	//void computeIMU( void );
+  // changed by nishi 2025.3.7
+	bool computeIMU( void );
 
   #ifdef ICM20948_IMU
   // Offsets applied to raw x/y/z mag values

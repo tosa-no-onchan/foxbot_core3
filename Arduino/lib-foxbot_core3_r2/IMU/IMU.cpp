@@ -100,9 +100,11 @@ uint8_t cIMU::begin( uint32_t hz ){
     pre_time = millis();
 
    	#if defined(USE_DMP_NISHI)
-      while(!SEN.dmp_cali_get_done()){
+     //SERIAL_PORT.println("cIMU::begin():#4");
+     while(!SEN.dmp_cali_get_done()){
+        //SERIAL_PORT.println("cIMU::begin():#5");
         update();
-        if (millis()-pre_time > 5000){
+        if (millis()-pre_time > 15000){
           break;
         }
         #if !defined(IMU_SENSER6)
@@ -111,6 +113,7 @@ uint8_t cIMU::begin( uint32_t hz ){
           delayMicroseconds(1000);
         #endif
       }
+      //SERIAL_PORT.println("cIMU::begin():#6");
     #else
       while(!SEN.gyro_cali_get_done()){
         update();
@@ -136,13 +139,15 @@ uint8_t cIMU::begin( uint32_t hz ){
      ARG     : void
      RET     : void
 ---------------------------------------------------------------------------*/
-uint16_t cIMU::update( uint32_t option ){
-  // changed by nishi
+//uint16_t cIMU::update( uint32_t option ){
+bool cIMU::update( uint32_t option ){
+    // changed by nishi
   //UNUSED(option);
 
-	uint16_t ret_time = 0;
- 	computeIMU();
-	return ret_time;
+	//uint16_t ret_time = 0;
+  // changed by nishi 2025.3.7
+ 	return computeIMU();
+	//return ret_time;
 }
 
 #define FILTER_NUM    3
@@ -153,8 +158,10 @@ uint16_t cIMU::update( uint32_t option ){
      ARG     : void
      RET     : void
 ---------------------------------------------------------------------------*/
-void cIMU::computeIMU( void ){
-  //static unsigned long prev_process_time = micros();
+//void cIMU::computeIMU( void ){
+// changed by nishi 2025.3.7
+bool cIMU::computeIMU( void ){
+    //static unsigned long prev_process_time = micros();
   static foxbot3::usec_t prev_process_time = foxbot3::micros_();
   //static unsigned long cur_process_time = 0;
   static foxbot3::usec_t cur_process_time = 0;
@@ -169,6 +176,8 @@ void cIMU::computeIMU( void ){
 
   uint32_t axis;
 
+  bool rc=true;   // add by nishi 2025.3.7
+
 
   #if defined(USE_ACC_NISHI)
     // Get Acc data
@@ -179,21 +188,27 @@ void cIMU::computeIMU( void ){
 	  SEN.gyro_get_adc();
   #endif
 
-  #ifdef USE_DMP_NISHI
+  #if defined(USE_DMP_NISHI)
     // Get DMP data
     if(SEN.dmp_get_adc()!=true){
       //digitalWrite(LED_BUILTIN, HIGH-digitalRead(LED_BUILTIN));   // blink the blue
-      return;
+      // return;
+      // changed by nishi 2025.3.7
+      return false;
     }
     // DMP Caliburation not yet?
     if(SEN.calibratingD_f == 0){
-      return;
+      // return;
+      // changed by nishi 2025.3.7
+      return false;
     }
   #endif
   #if defined(USE_ACC_NISHI)
     // Acc Caliburation not yet?
     if(SEN.calibratingA_f == 0){
-      return;
+      //return;
+      // changed by nishi 2025.3.7
+      return false;
     }
   #endif
   #if defined(USE_GRYO_NISHI)
@@ -201,7 +216,9 @@ void cIMU::computeIMU( void ){
     //  digitalWrite(LED_BUILTIN, HIGH-digitalRead(LED_BUILTIN));   // blink the blue
     //}
     if(SEN.calibratingG_f == 0){
-      return;
+      //return;
+      // changed by nishi 2025.3.7
+      return false;
     }
   #endif
 
@@ -523,6 +540,8 @@ void cIMU::computeIMU( void ){
       cali_tf ++;
     }
   #endif
+  // add by nishi 2025.3.7
+  return rc;
 
 }
 

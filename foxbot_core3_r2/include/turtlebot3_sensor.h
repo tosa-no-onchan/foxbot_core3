@@ -88,7 +88,9 @@ class Turtlebot3Sensor
   uint8_t initIMU(void);
   //sensor_msgs::Imu getIMU(void);
   sensor_msgs__msg__Imu getIMU(void);
-  void updateIMU(void);
+  //void updateIMU(void);
+  // changed by nishi 2025.3.6
+  bool updateIMU(void);
   void calibrationGyro(void);
   void copyIMU(void);
 
@@ -126,7 +128,7 @@ class Turtlebot3Sensor
   void initLED(void);
   void setLedPattern(double linear_vel, double angular_vel);
 
-  cIMU imu_;
+  cIMU cimu_;
 
 
  private:

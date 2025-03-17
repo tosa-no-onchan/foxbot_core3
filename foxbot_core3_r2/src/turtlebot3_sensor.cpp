@@ -57,7 +57,7 @@ uint8_t Turtlebot3Sensor::init(unsigned long baud)
   //battery_state_msg_.design_capacity = NAN;
   //battery_state_msg_.percentage      = NAN;
 
-  get_error_code = imu_.begin(206);
+  get_error_code = cimu_.begin(206);
 
   #ifdef DEBUG_N
   if (get_error_code != 0x00)
@@ -70,21 +70,25 @@ uint8_t Turtlebot3Sensor::init(unsigned long baud)
 }
 
 uint8_t Turtlebot3Sensor::initIMU(void){
-  return imu_.begin(206);
+  return cimu_.begin(206);
 }
 
 #define LED_BUILTIN 17
 //#define LED_BUILTIN 4
 
-void Turtlebot3Sensor::updateIMU(void){
-  imu_.update();
+//void Turtlebot3Sensor::updateIMU(void){
+// chnaged by nishi 2025.37
+bool Turtlebot3Sensor::updateIMU(void){
+    //cimu_.update();
+    // changed by nishi 2025.3.7
+    return cimu_.update();
 }
 
 void Turtlebot3Sensor::copyIMU(void){
-  quat[0]=imu_.quat[0];
-  quat[1]=imu_.quat[1];
-  quat[2]=imu_.quat[2];
-  quat[3]=imu_.quat[3];
+  quat[0]=cimu_.quat[0];
+  quat[1]=cimu_.quat[1];
+  quat[2]=cimu_.quat[2];
+  quat[3]=cimu_.quat[3];
 }
 
 void Turtlebot3Sensor::calibrationGyro()
@@ -94,14 +98,14 @@ void Turtlebot3Sensor::calibrationGyro()
 
   const uint8_t led_ros_connect = 3;
 
-  imu_.SEN.gyro_cali_start();
+  cimu_.SEN.gyro_cali_start();
   
   t_time   = millis();
   pre_time = millis();
 
-  while(!imu_.SEN.gyro_cali_get_done())
+  while(!cimu_.SEN.gyro_cali_get_done())
   {
-    imu_.update();
+    cimu_.update();
 
     if (millis()-pre_time > 5000)
     {
@@ -119,9 +123,9 @@ void Turtlebot3Sensor::calibrationGyro()
 //sensor_msgs::Imu Turtlebot3Sensor::getIMU(void)
 sensor_msgs__msg__Imu Turtlebot3Sensor::getIMU(void)
 {
-  imu_msg_.angular_velocity.x = imu_.SEN.gyroADC[0] * GYRO_FACTOR;
-  imu_msg_.angular_velocity.y = imu_.SEN.gyroADC[1] * GYRO_FACTOR;
-  imu_msg_.angular_velocity.z = imu_.SEN.gyroADC[2] * GYRO_FACTOR;
+  imu_msg_.angular_velocity.x = cimu_.SEN.gyroADC[0] * GYRO_FACTOR;
+  imu_msg_.angular_velocity.y = cimu_.SEN.gyroADC[1] * GYRO_FACTOR;
+  imu_msg_.angular_velocity.z = cimu_.SEN.gyroADC[2] * GYRO_FACTOR;
   imu_msg_.angular_velocity_covariance[0] = 0.02;
   imu_msg_.angular_velocity_covariance[1] = 0;
   imu_msg_.angular_velocity_covariance[2] = 0;
@@ -132,19 +136,19 @@ sensor_msgs__msg__Imu Turtlebot3Sensor::getIMU(void)
   imu_msg_.angular_velocity_covariance[7] = 0;
   imu_msg_.angular_velocity_covariance[8] = 0.02;
 
-  //imu_msg_.linear_acceleration.x = imu_.SEN.accADC[0] * ACCEL_FACTOR;
-  //imu_msg_.linear_acceleration.y = imu_.SEN.accADC[1] * ACCEL_FACTOR;
-  //imu_msg_.linear_acceleration.z = imu_.SEN.accADC[2] * ACCEL_FACTOR;
+  //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR;
+  //imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR;
+  //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
 
   // MPU6500
-  //imu_msg_.linear_acceleration.x = imu_.SEN.accADC[0] * ACCEL_FACTOR - 2.65;
-  //imu_msg_.linear_acceleration.y = imu_.SEN.accADC[1] * ACCEL_FACTOR + 0.8;
-  //imu_msg_.linear_acceleration.z = imu_.SEN.accADC[2] * ACCEL_FACTOR;
+  //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR - 2.65;
+  //imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR + 0.8;
+  //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
 
   // ICM-20948
-  imu_msg_.linear_acceleration.x = imu_.SEN.accADC[0] * ACCEL_FACTOR;
-  imu_msg_.linear_acceleration.y = imu_.SEN.accADC[1] * ACCEL_FACTOR;
-  imu_msg_.linear_acceleration.z = imu_.SEN.accADC[2] * ACCEL_FACTOR;
+  imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR;
+  imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR;
+  imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
 
   imu_msg_.linear_acceleration_covariance[0] = 0.04;
   imu_msg_.linear_acceleration_covariance[1] = 0;
@@ -156,10 +160,10 @@ sensor_msgs__msg__Imu Turtlebot3Sensor::getIMU(void)
   imu_msg_.linear_acceleration_covariance[7] = 0;
   imu_msg_.linear_acceleration_covariance[8] = 0.04;
 
-  //imu_msg_.orientation.w = imu_.quat[0];
-  //imu_msg_.orientation.x = imu_.quat[1];
-  //imu_msg_.orientation.y = imu_.quat[2];
-  //imu_msg_.orientation.z = imu_.quat[3];
+  //imu_msg_.orientation.w = cimu_.quat[0];
+  //imu_msg_.orientation.x = cimu_.quat[1];
+  //imu_msg_.orientation.y = cimu_.quat[2];
+  //imu_msg_.orientation.z = cimu_.quat[3];
 
   // MPU6500 & ICM-20948
   imu_msg_.orientation.w = quat[0];
@@ -185,10 +189,10 @@ float* Turtlebot3Sensor::getOrientation(void)
 {
   static float orientation[4];
 
-  orientation[0] = imu_.quat[0];
-  orientation[1] = imu_.quat[1];
-  orientation[2] = imu_.quat[2];
-  orientation[3] = imu_.quat[3];
+  orientation[0] = cimu_.quat[0];
+  orientation[1] = cimu_.quat[1];
+  orientation[2] = cimu_.quat[2];
+  orientation[3] = cimu_.quat[3];
 
   return orientation;
 }
@@ -196,9 +200,9 @@ float* Turtlebot3Sensor::getOrientation(void)
 //sensor_msgs::MagneticField Turtlebot3Sensor::getMag(void)
 sensor_msgs__msg__MagneticField Turtlebot3Sensor::getMag(void)
 {
-  mag_msg_.magnetic_field.x = imu_.SEN.magADC[0] * MAG_FACTOR;
-  mag_msg_.magnetic_field.y = imu_.SEN.magADC[1] * MAG_FACTOR;
-  mag_msg_.magnetic_field.z = imu_.SEN.magADC[2] * MAG_FACTOR;
+  mag_msg_.magnetic_field.x = cimu_.SEN.magADC[0] * MAG_FACTOR;
+  mag_msg_.magnetic_field.y = cimu_.SEN.magADC[1] * MAG_FACTOR;
+  mag_msg_.magnetic_field.z = cimu_.SEN.magADC[2] * MAG_FACTOR;
 
   mag_msg_.magnetic_field_covariance[0] = 0.0048;
   mag_msg_.magnetic_field_covariance[1] = 0;

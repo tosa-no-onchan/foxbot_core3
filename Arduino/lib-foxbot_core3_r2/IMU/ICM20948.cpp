@@ -33,7 +33,6 @@ float cICM20948::invSqrt(float x) {
 	return y;
 }
 
-
 cICM20948::cICM20948()
 {
 	calibratingG = 0;
@@ -404,7 +403,7 @@ bool cICM20948::init( void ){
     SERIAL_PORT.println(F("Configuration complete!"));
 
       // DEBUG by nishi
-      #ifdef DEBUG_NISHI_8
+      #if defined(DEBUG_NISHI_8)
       // bank0 USER_CTRL 0x03
       myICM.setBank(0); // myICM.startupMagnetometer(); の後は、Bank が変わる。
       rc_my = myICM.read(0x03, (uint8_t *)&data, sizeof(data));
@@ -452,7 +451,9 @@ bool cICM20948::init( void ){
 
     // Enable the DMP orientation sensor
     #if !defined(IMU_SENSER6)
+      // 2025.3.14 以前は、こちらを使用
       success &= (myICM.enableDMPSensor(INV_ICM20948_SENSOR_ORIENTATION) == ICM_20948_Stat_Ok);   // original  2021.11.11
+      // 2025.3.14 から、こちらに変えてみます。
       //success &= (myICM.enableDMPSensor(INV_ICM20948_SENSOR_ROTATION_VECTOR) == ICM_20948_Stat_Ok);   // test 2 -> OK 2024.2.19
     #else
       //success &= (myICM.enableDMPSensor(INV_ICM20948_SENSOR_GRAVITY) == ICM_20948_Stat_Ok);   // test 3
@@ -591,7 +592,7 @@ void cICM20948::gyro_init( void ){
 	//calibratingG = MPU_CALI_COUNT;
 }
 
-#ifdef USE_SPARK_LIB
+#if defined(USE_SPARK_LIB)
 void cICM20948::gyro_get_adc( void ){
 	int16_t x = 0;
 	int16_t y = 0;
@@ -694,7 +695,7 @@ void cICM20948::acc_init( void ){
   accIMZero=0.0;
 }
 
-#ifdef USE_SPARK_LIB
+#if defined(USE_SPARK_LIB)
 void cICM20948::acc_get_adc( void ){
 	int16_t x = 0;
 	int16_t y = 0;
@@ -1001,10 +1002,14 @@ bool cICM20948::dmp_get_adc(){
   icm_20948_DMP_data_t data;
   myICM.readDMPdataFromFIFO(&data);
 
-  static int32_t d[4];
+  //static int32_t d[4];
+  // changed by nishi 2025.3.14
+  static double d[4];
   
   static byte f=0;
   static double q[4]={1.0, 0.0, 0.0, 0.0};
+
+  #define QUAT_CALIB
 
   if ((myICM.status == ICM_20948_Stat_Ok) || (myICM.status == ICM_20948_Stat_FIFOMoreDataAvail)) // Was valid data available?
   {
@@ -1085,9 +1090,13 @@ bool cICM20948::dmp_get_adc(){
           SERIAL_PORT.println("dmp_get_adc() #5");
           #endif
                                               //   x x x x x
-          quatRAW[1] = data.Quat9.Data.Q1;    // 1 1 2 2 3 3
-          quatRAW[2] = data.Quat9.Data.Q2;    // 2 3 1 3 1 2
-          quatRAW[3] = data.Quat9.Data.Q3;    // 3 2 3 1 2 1
+          quatRAW[0] = q0;    // changed by nishi 2025.3.14
+          //quatRAW[1] = data.Quat9.Data.Q1;    // 1 1 2 2 3 3
+          quatRAW[1] = q1;    // changed by nishi 2025.3.14
+          //quatRAW[2] = data.Quat9.Data.Q2;    // 2 3 1 3 1 2
+          quatRAW[2] = q2;    // changed by nishi 2025.3.14
+          //quatRAW[3] = data.Quat9.Data.Q3;    // 3 2 3 1 2 1
+          quatRAW[3] = q3;    // changed by nishi 2025.3.14
 
 
           //#define TEST_W0_X2
@@ -1102,10 +1111,11 @@ bool cICM20948::dmp_get_adc(){
             SERIAL_PORT.println(data.Quat9.Data.Accuracy);
           #endif
 
+          // キャリブレーション中です。
           if(calibratingD_f == 0){
             calibratingD++;
-            if(calibratingD >= 20){
-              if(calibratingD == 20){
+            if(calibratingD >= 200){
+              if(calibratingD == 200){
                 d[1]=0;
                 d[2]=0;
                 d[3]=0;
@@ -1114,15 +1124,18 @@ bool cICM20948::dmp_get_adc(){
               d[2] += quatRAW[2];             // Sum up 512 readings
               d[3] += quatRAW[3];             // Sum up 512 readings
 
-              if(calibratingD >= 40){
-                quatZero[1] = d[1] / 40;
-                quatZero[2] = d[2] / 40;
-                quatZero[3] = d[3] / 40; 
+              // キャリブレーションの終了回数に到達した。
+              if(calibratingD >= 400){
+
+                // DMP の初期誤差を計算する。
+                quatZero[1] = d[1] / 200;
+                quatZero[2] = d[2] / 200;
+                quatZero[3] = d[3] / 200; 
 
                 calibratingD_f = 1;
-                
                 calibratingD = 0;
 
+                //#define TEST_W0_X3
                 #if defined(TEST_W0_X3)
                   SERIAL_PORT.print(F("#7 Q1:"));
                   SERIAL_PORT.print(quatRAW[1]);
@@ -1132,18 +1145,16 @@ bool cICM20948::dmp_get_adc(){
                   SERIAL_PORT.println(quatRAW[3]);
                   SERIAL_PORT.print(F(" Accuracy:"));
                   SERIAL_PORT.println(data.Quat9.Data.Accuracy);
+                  //while(1){
+                  //  delay(100);
+                  //}
                 #endif
-
               }
             }
-
-
+            // キャリブレーションが終了した直後です。
             if (calibratingD_f == 1)
             {
-              //accZero[YAW] -= ACC_1G;
-              //magZero[YAW] = 0;
-
-              //#if defined(QUAT_ANIMATION)
+              //#define TEST_W0_X4
               #if defined(TEST_W0_X4)
                 SERIAL_PORT.print(F("#8 Q1:"));
                 SERIAL_PORT.print(quatRAW[1]);
@@ -1160,20 +1171,42 @@ bool cICM20948::dmp_get_adc(){
                 SERIAL_PORT.println(quatZero[3]);
                 //SERIAL_PORT.print(F(" Accuracy:"));
                 //SERIAL_PORT.println(data.Quat9.Data.Accuracy);
-                
               #endif
+
+              // DMP の誤差 quat の実数部を求める。
+              quatZero[0] =1.0 - ((quatZero[1] * quatZero[1]) + (quatZero[2] * quatZero[2]) + (quatZero[3] * quatZero[3]));
+              if(quatZero[0] >= 0.0) quatZero[0] = sqrt(quatZero[0]);
+              else quatZero[0] = sqrt(quatZero[0] * -1.0) * -1.0;
+
+              // DMP 誤差 quat の補正(共役)  --> 誤差の分だけ、反対方向に回転させる。
+              quatZeroK[1] = quatZero[1] * -1.0;
+              quatZeroK[2] = quatZero[2] * -1.0;
+              quatZeroK[3] = quatZero[3] * -1.0;
+              //quatZeroK[0] =1.0 - ((quatZeroK[1] * quatZeroK[1]) + (quatZeroK[2] * quatZeroK[2]) + (quatZeroK[3] * quatZeroK[3]));
+              //if(quatZeroK[0] >= 0.0) quatZeroK[0] = sqrt(quatZeroK[0]);
+              //else quatZeroK[0] = sqrt(quatZeroK[0] * -1.0) * -1.0;
+              quatZeroK[0]=quatZero[0];
+
             }
           }
-
-          //quat[1] = ((double)(quatRAW[1] - quatZero[1])) / 1073741824.0; // Convert to double. Divide by 2^30  -- X
-          //quat[2] = ((double)(quatRAW[2] - quatZero[2])) / 1073741824.0; // Convert to double. Divide by 2^30  -- Y
-          //quat[3] = ((double)(quatRAW[3] - quatZero[3])) / 1073741824.0; // Convert to double. Divide by 2^30  -- Z
-          //quat[0] = sqrt(1.0 - ((quat[1] * quat[1]) + (quat[2] * quat[2]) + (quat[3] * quat[3])));    //  -- W
-
-          quat[0] = q0;
-          quat[1] = q1;
-          quat[2] = q2;
-          quat[3] = q3;
+          // キャリブレーション完了後です。
+          else{
+            // add by nishi 2025.3.16
+            // DMP の初期誤差だけ、補正します。
+            #if defined(QUAT_CALIB)
+              //double ans[4];
+              //foxbot3::Kakezan(quatZeroK, quatRAW, ans);
+              //foxbot3::Kakezan(ans, quatZero, quat);   // これをしたら、もとに戻る。
+              // 下の積の処理だけで、OK みたい。 by nishi 2025.3.15
+              foxbot3::Kakezan(quatZeroK, quatRAW, quat);
+              
+            #else
+              quat[0] = q0;
+              quat[1] = q1;
+              quat[2] = q2;
+              quat[3] = q3;
+            #endif
+          }
 
           rc=true;
 
@@ -1220,6 +1253,12 @@ bool cICM20948::dmp_get_adc(){
         else q0 = sqrt(q0 * -1.0) * -1.0;
 
         if(!isnan(q0)){
+
+          quatRAW[0] = q0;    // changed by nishi 2025.3.14
+          quatRAW[1] = q1;    // changed by nishi 2025.3.14
+          quatRAW[2] = q2;    // changed by nishi 2025.3.14
+          quatRAW[3] = q3;    // changed by nishi 2025.3.14
+
           if(calibratingD_f == 0){
             calibratingD++;
             if(calibratingD >= 400){
@@ -1228,41 +1267,59 @@ bool cICM20948::dmp_get_adc(){
                 d[2]=0;
                 d[3]=0;
               }
-              d[1] += data.Quat6.Data.Q1;             // Sum up 512 readings
-              d[2] += data.Quat6.Data.Q2;             // Sum up 512 readings
-              d[3] += data.Quat6.Data.Q3;             // Sum up 512 readings
+              d[1] += quatRAW[1];             // Sum up 512 readings
+              d[2] += quatRAW[2];             // Sum up 512 readings
+              d[3] += quatRAW[3];             // Sum up 512 readings
 
               if(calibratingD >= 600){
-                quatZero[1] = d[1] / 600;
-                quatZero[2] = d[2] / 600;
-                quatZero[3] = d[3] / 600; 
+                quatZero[1] = d[1] / 200;
+                quatZero[2] = d[2] / 200;
+                quatZero[3] = d[3] / 200; 
 
                 calibratingD_f=1;
                 calibratingD = 0;
               }
             }
+            if (calibratingD_f == 1)
+            {
+              // DMP の誤差 quat の実数部を求める。
+              quatZero[0] =1.0 - ((quatZero[1] * quatZero[1]) + (quatZero[2] * quatZero[2]) + (quatZero[3] * quatZero[3]));
+              if(quatZero[0] >= 0.0) quatZero[0] = sqrt(quatZero[0]);
+              else quatZero[0] = sqrt(quatZero[0] * -1.0) * -1.0;
+
+              // DMP 誤差 quat の補正(共役)  --> 誤差の分だけ、反対方向に回転させる。
+              quatZeroK[1] = quatZero[1] * -1.0;
+              quatZeroK[2] = quatZero[2] * -1.0;
+              quatZeroK[3] = quatZero[3] * -1.0;
+              //quatZeroK[0] =1.0 - ((quatZeroK[1] * quatZeroK[1]) + (quatZeroK[2] * quatZeroK[2]) + (quatZeroK[3] * quatZeroK[3]));
+              //if(quatZeroK[0] >= 0.0) quatZeroK[0] = sqrt(quatZeroK[0]);
+              //else quatZeroK[0] = sqrt(quatZeroK[0] * -1.0) * -1.0;
+              quatZeroK[0]=quatZero[0];
+            }
           }
-          //quatRAW[1] = data.Quat6.Data.Q1 - quatZero[1];
-          //quatRAW[2] = data.Quat6.Data.Q2 - quatZero[2];
-          //quatRAW[3] = data.Quat6.Data.Q3 - quatZero[3];
+          // キャリブレーション完了後です。
+          else{
+            // add by nishi 2025.3.16
+            // DMP の初期誤差だけ、補正します。
+            #if defined(QUAT_CALIB)
+              //double ans[4];
+              //foxbot3::Kakezan(quatZeroK, quatRAW, ans);
+              //foxbot3::Kakezan(ans, quatZero, quat);   // これをしたら、もとに戻る。
+              // 下の積の処理だけで、OK みたい。 by nishi 2025.3.15
+              foxbot3::Kakezan(quatZeroK, quatRAW, quat);
 
-          //q1 = ((double)quatRAW[1]) / 1073741824.0; // Convert to double. Divide by 2^30  -- X
-          //q2 = ((double)quatRAW[2]) / 1073741824.0; // Convert to double. Divide by 2^30  -- Y
-          //q3 = ((double)quatRAW[3]) / 1073741824.0; // Convert to double. Divide by 2^30  -- Z
-
-          //q0=1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3));
-          //if(q0 >= 0.0) q0 = sqrt(q0);
-          //else q0 = sqrt(q0 * -1.0) * -1.0;
-
-          quat[0]=q0; // W
-          quat[1]=q1; // X
-          quat[2]=q2; // Y
-          quat[3]=q3; // Z
+            #else
+              quat[0] = q0;
+              quat[1] = q1;
+              quat[2] = q2;
+              quat[3] = q3;
+            #endif
+          }
 
           rc=true;
 
           //#define TEST_W0_X2
-          #ifdef TEST_W0_X2
+          #if defined(TEST_W0_X2)
             SERIAL_PORT.print(F("Q0:"));
             SERIAL_PORT.print(q0, 3);
             SERIAL_PORT.print(F(" Q1:"));

@@ -8,7 +8,7 @@
 #include <inttypes.h>
 #include <Arduino.h>
 #include "Define.h"
-
+#include "com_lib.h"
 
 #define ICM20948_IMU
 
@@ -29,7 +29,9 @@
 #if defined(USE_FOXBOT)
 	// add by nishi
 	#define USE_SPARK_LIB
+	// 有効にする。 by nishi 2025.3.9
 	//#define USE_ACC_NISHI
+	// 有効にする。 by nishi 2025.3.9
 	//#define USE_GRYO_NISHI
 	#define USE_DMP_NISHI
 	//#define USE_MADWICK
@@ -258,8 +260,11 @@ public:
 	int16_t AK8963_ASA[3];
 
 	double quat[4];		// add by nishi
-	int32_t quatRAW[4];		// add by nishi
-	int32_t quatZero[4];		// add by nishi
+	//int32_t quatRAW[4];		// add by nishi
+	double quatRAW[4];		// changed by nishi 2025.3.14
+	//int32_t quatZero[4];		// add by nishi
+	double quatZero[4];		// changed by nishi 2025.3.14
+	double quatZeroK[4]={1.0, 0.0, 0.0, 0.0};		// changed by nishi 2025.3.15
 
 	//aRes = 1.0/16384.0;    // 2g  -> 16384[LSB/g]  ax,ay,az=16384 で、 1[g] を示す。
 	//aRes = 1.0/8192.0;     // 4g  -> 8192[LSB/g]	ax,ay,az=8192 で、 1[g] を示す。
