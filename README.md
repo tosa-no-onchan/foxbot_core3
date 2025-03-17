@@ -4,7 +4,8 @@
 ESP32 で、モーター駆動、IMU のデータ取り込みと、Host SBC への転送をおこないます。  
 Host SBC との通信は、Esp32 Serial - Orange Pi 5 Serial で、micro-ROS for Arduino を利用します。  
 
-foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。 
+foxbot_core3 (ros2 galactic) 版を、ros2 humble 向けに改造しました。  
+対応: ros2 humble and jazzy  
 
 詳しい内容は、  
 [ROS2 で、ESP32(Arduino) を使う。](http://www.netosa.com/blog/2022/10/ros2-esp32arduino.html)  
@@ -169,3 +170,8 @@ portENTER_CRITICAL(&mutex);
 sensors.copyIMU();
 portEXIT_CRITICAL(&mutex);
 ``````
+
+2025.3.17  
+
+      1) ICM-20948 DMP6 and DMP9 のキャリブレーション時に、起動時の初期誤差を  
+      補正する処理を追加しました。  
