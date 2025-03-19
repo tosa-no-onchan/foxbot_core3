@@ -113,6 +113,15 @@ Edit ~/Arduino/lib-foxbot_core3_r2/micro_ros_arduino/src/default_transport.cpp
 #### 8. Chose foxbot_core3_r2 pubish topics    
 Edit foxbot_core3_r2_config.h  
     
+    // 2) use odom topic name which '/odom' or '/odom_fox'  add by nishi 2023.4.4
+    #define USE_ODOM_FOX
+
+    #if defined(USE_ODOM_FOX)
+        const char * odom_topic_name = "odom_fox";
+    #else
+        const char * odom_topic_name = "odom";
+    #endif
+
     // add by nishi 2022.9.9    
     // use_tf_static==true : publist tf odom -> base_footprint   
     bool use_tf_static=true;    
