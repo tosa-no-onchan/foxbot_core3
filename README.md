@@ -185,5 +185,10 @@ portEXIT_CRITICAL(&mutex);
       1) ICM-20948 DMP6 and DMP9 のキャリブレーション時に、起動時の初期誤差を  
       補正する処理を追加しました。  
 
+2025.3.24  
+
+      1) ICM-20948 DMP6 and DMP9 を止めて、ACC、Gyro、 Magnet + MadgwickAHRS を使うことにした。  
+    
+
 これに関する記事。  
 [ROS2 自作 Turtlebot3 による 草刈りロボット開発。#11 ロボットの走行方向がずれる。](https://www.netosa.com/blog/2025/03/ros2-turtlebot3-11.html)  
