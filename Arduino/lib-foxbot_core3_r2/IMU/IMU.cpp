@@ -139,15 +139,18 @@ uint8_t cIMU::begin( uint32_t hz ){
      ARG     : void
      RET     : void
 ---------------------------------------------------------------------------*/
-//uint16_t cIMU::update( uint32_t option ){
 bool cIMU::update( uint32_t option ){
-    // changed by nishi
+  // changed by nishi
   //UNUSED(option);
 
-	//uint16_t ret_time = 0;
+  // add by nishi 2025.3.23
+  #if defined(Teensy_ICM)
+    // Must call this often in main loop -- updates the sensor values
+    SEN.update();
+  #endif
+
   // changed by nishi 2025.3.7
- 	return computeIMU();
-	//return ret_time;
+  return computeIMU();
 }
 
 #define FILTER_NUM    3
@@ -158,10 +161,8 @@ bool cIMU::update( uint32_t option ){
      ARG     : void
      RET     : void
 ---------------------------------------------------------------------------*/
-//void cIMU::computeIMU( void ){
-// changed by nishi 2025.3.7
 bool cIMU::computeIMU( void ){
-    //static unsigned long prev_process_time = micros();
+  //static unsigned long prev_process_time = micros();
   static foxbot3::usec_t prev_process_time = foxbot3::micros_();
   //static unsigned long cur_process_time = 0;
   static foxbot3::usec_t cur_process_time = 0;
@@ -178,7 +179,6 @@ bool cIMU::computeIMU( void ){
 
   bool rc=true;   // add by nishi 2025.3.7
 
-
   #if defined(USE_ACC_NISHI)
     // Get Acc data
 	  SEN.acc_get_adc();
@@ -188,36 +188,36 @@ bool cIMU::computeIMU( void ){
 	  SEN.gyro_get_adc();
   #endif
 
+  #if defined(USE_MAG)
+    // Get Magnet data
+    SEN.mag_get_adc();
+  #endif
+
   #if defined(USE_DMP_NISHI)
     // Get DMP data
     if(SEN.dmp_get_adc()!=true){
       //digitalWrite(LED_BUILTIN, HIGH-digitalRead(LED_BUILTIN));   // blink the blue
-      // return;
-      // changed by nishi 2025.3.7
       return false;
     }
     // DMP Caliburation not yet?
     if(SEN.calibratingD_f == 0){
-      // return;
-      // changed by nishi 2025.3.7
       return false;
     }
   #endif
+
   #if defined(USE_ACC_NISHI)
     // Acc Caliburation not yet?
     if(SEN.calibratingA_f == 0){
-      //return;
-      // changed by nishi 2025.3.7
       return false;
     }
   #endif
   #if defined(USE_GRYO_NISHI)
-    //if (SEN.mag_get_adc()==true){
-    //  digitalWrite(LED_BUILTIN, HIGH-digitalRead(LED_BUILTIN));   // blink the blue
-    //}
     if(SEN.calibratingG_f == 0){
-      //return;
-      // changed by nishi 2025.3.7
+      return false;
+    }
+  #endif
+  #if defined(USE_MAG)
+    if(SEN.calibratingM_f == 0){
       return false;
     }
   #endif
@@ -264,7 +264,6 @@ bool cIMU::computeIMU( void ){
       gyroRaw[i]  = SEN.gyroRAW[i];
       gyroData[i] = SEN.gyroADC[i];
     #endif
-
     #if defined(USE_MAG)
       magRaw[i]   = SEN.magRAW[i];
       magData[i]  = SEN.magADC[i];
@@ -319,7 +318,7 @@ bool cIMU::computeIMU( void ){
   #endif
 
   #if defined(USE_MAG)
-    #ifdef ICM20948_IMU
+    #if defined(ICM20948_IMU)
       // Apply mag offset compensation (base values in uTesla)
       //float x = SEN.magADC[0] - mag_offsets[0];
       //float y = SEN.magADC[1] - mag_offsets[1];
@@ -347,28 +346,21 @@ bool cIMU::computeIMU( void ){
   prev_process_time = cur_process_time;
 
   #if defined(USE_MADWICK)
+    filter.invSampleFreq = (float)process_time/1000000.0f;
     #if defined(IMU_SENSER6)
-      if (SEN.calibratingG_f != 0 && SEN.calibratingA_f != 0){
-        filter.invSampleFreq = (float)process_time/1000000.0f;
-        filter.updateIMU(gx0, gy0, gz0, ax0, ay0, az0);
-      }
-      else{
-        return;
-      }
+      filter.updateIMU(gx0, gy0, gz0, ax0, ay0, az0);
     #else
-      if (SEN.calibratingG_f != 0 && SEN.calibratingA_f != 0 && SEN.calibratingM==0){
-        filter.invSampleFreq = (float)process_time/1000000.0f;
-        filter.update(gx0, gy0, gz0, ax0, ay0, az0, mx0, my0, mz0);
-        //filter.update(gx, gy, gz*-1.0, ax, ay, az, mx, my, mz);
-        //filter.update(gx, gy, gz, ax, ay, az, my, mx, mz*-1.0);
-        //filter.update(gx, gy, gz, ax, ay, az, mx*-1.0, my, mz);
-      }
+      filter.update(gx0, gy0, gz0, ax0, ay0, az0, mx0, my0, mz0);
+      //filter.update(gx, gy, gz*-1.0, ax, ay, az, mx, my, mz);
+      //filter.update(gx, gy, gz, ax, ay, az, my, mx, mz*-1.0);
+      //filter.update(gx, gy, gz, ax, ay, az, mx*-1.0, my, mz);
     #endif
 
     rpy[0] = filter.getRoll();
     rpy[1] = filter.getPitch();
     rpy[2] = filter.getYaw()-180.;
 
+    //filter.getQuaternion(&quat[0], &quat[1], &quat[2], &quat[3]);
     quat_tmp[0] = filter.q0;  // W
     quat_tmp[1] = filter.q1;  // X
     quat_tmp[2] = filter.q2;  // Y
@@ -386,8 +378,6 @@ bool cIMU::computeIMU( void ){
       SERIAL_PORT.println(quat_tmp[4], 8);
     #endif
 
-    //filter.getQuaternion(&quat[0], &quat[1], &quat[2], &quat[3]);
-
     angle[0] = (int16_t)(rpy[0] * 10.);
     angle[1] = (int16_t)(rpy[1] * 10.);
     angle[2] = (int16_t)(rpy[1] * 1.);
@@ -400,7 +390,6 @@ bool cIMU::computeIMU( void ){
     quat[2] = SEN.quat[2];  // Y
     quat[3] = SEN.quat[3];  // Z
   #endif
-
 
   #if defined(USE_IMU_DIST)
     // Cumpute CB 
@@ -530,7 +519,8 @@ bool cIMU::computeIMU( void ){
       cali_tf ++;
     }
   #elif defined(USE_MADWICK)
-    if(cali_tf >= 7000){
+    //if(cali_tf >= 7000){
+    if(cali_tf >= 150){
       quat[0] = filter.q0;  // W
       quat[1] = filter.q1;  // X
       quat[2] = filter.q2;  // Y

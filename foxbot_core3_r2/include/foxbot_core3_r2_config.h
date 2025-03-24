@@ -51,7 +51,8 @@
 
 //#include <micro_ros_utilities/type_utilities.h>
 //#include <micro_ros_utilities/string_utilities.h>
-
+#include <geometry_msgs/msg/vector3.h>
+//#include <geometry_msgs/msg/quaternion.h>
 
 //---------------------------------------------------
 // change these params for your robot contorol 1
@@ -208,7 +209,9 @@ MedianFilter motor_left_direction_median_filter(RATE_DIRECTION_MEDIAN_FILTER_SIZ
 #define LEFT                             0
 #define RIGHT                            1
 
-
+// add by nishi 2025.3.20
+#define IMU_DATA_RATE_THRES    26       // 28[Hz]
+//#define IMU_DATA_RATE_THRES    16       // 18[Hz]
 // add by nishi end
 
 
@@ -326,7 +329,10 @@ void updateOdometry(void);
 void updateTFPrefix(bool isConnected);
 void updateJointStates(void);
 //void updateTF(geometry_msgs::TransformStamped& odom_tf);
-void updateTF(geometry_msgs__msg__TransformStamped& odom_tf);
+//void updateTF(geometry_msgs__msg__TransformStamped& odom_tf);
+// changed by nishi 2025.3.18
+void updateTF(geometry_msgs__msg__TransformStamped& odom_tf,nav_msgs__msg__Odometry& odom);
+
 void updateMotorInfo(int32_t left_tick, int32_t right_tick);
 void initOdom(void);
 void initJointStates(void);
@@ -335,7 +341,7 @@ void updateVariable(bool isConnected);
 builtin_interfaces__msg__Time rosNow();
 void updateGyroCali(bool isConnected); // add by nishi 2021.11.3
 void publishImuMsg(void);   // add by nishi 2021.7.5
-#ifdef USE_MAG
+#if defined(USE_MAG_X)
     void publishMagMsg(void);   // add by nishi 2021.11.4
 #endif
 
@@ -387,7 +393,9 @@ const char * imu_topic_name = "imu";
 -- Odometry publisher
 --------------------------------------------------------*/
 // Odometry of Turtlebot3 ROS2
-nav_msgs__msg__Odometry odom;
+//nav_msgs__msg__Odometry odom;
+// changed by nishi 2025.3.18
+nav_msgs__msg__Odometry odom_;
 rcl_publisher_t odom_publisher;
 #if defined(USE_ODOM_FOX)
     const char * odom_topic_name = "odom_fox";
@@ -408,7 +416,7 @@ rcl_publisher_t odom_publisher;
 //sensor_msgs::JointState joint_states;
 //ros::Publisher joint_states_pub("joint_states", &joint_states);
 
-#if defined(USE_MAG)
+#if defined(USE_MAG_X)
     // Magnetic field
     sensor_msgs::MagneticField mag_msg;
     ros::Publisher mag_pub("magnetic_field", &mag_msg);
@@ -456,18 +464,21 @@ bool sen_init=false;
 
 
 /* DEBUG */
+std_msgs__msg__UInt32 debug_left;
 #if defined(USE_DEBUG)
     //#include <geometry_msgs/msg/point.h>
     //geometry_msgs::Point debug_left;
     //ros::Publisher debug_publisher1("debug_left", &debug_left);
 
-    std_msgs__msg__UInt32 debug_left;
     rcl_publisher_t debug_left_publisher;
     const char * debug_left_topic_name = "debug_left";
 
-    //#include <geometry_msgs/Point.h>
-    //geometry_msgs::Point debug_right;
-    //ros::Publisher debug_publisher2("debug_right", &debug_right);
+    //std_msgs__msg__UInt32 debug_right;
+    geometry_msgs__msg__Vector3 debug_right;
+    //geometry_msgs__msg__Quaternion debug_right;
+    rcl_publisher_t debug_right_publisher;
+    const char * debug_right_topic_name = "debug_right";
+
 #endif
 
 template <typename type>
@@ -537,7 +548,8 @@ char joint_state_header_frame_id[30];
 //
 // add by nishi 2022.9.9
 // 3) use_tf_static==true : publist tf odom -> base_footprint 
-bool use_tf_static=false;
+//bool use_tf_static=false;
+bool use_tf_static=true;
 
 // 4) use_imu_pub==true : publist 'imu_fox' 
 bool use_imu_pub=true;

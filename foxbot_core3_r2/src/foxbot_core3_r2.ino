@@ -48,15 +48,15 @@
 // -D USE_TRACE
 
 #if defined(BOARD_ESP32)
-#include "soc/soc.h"
-#include "soc/rtc_cntl_reg.h"
-#include <analogWrite.h>
-#if defined(USE_TRACE)
-	#define LED_BUILTIN 4
-	HardwareSerial mySerial2(2);	// TX:17  RX:16
-#else
-	#define LED_BUILTIN 4		// 17 -> Serial2 
-#endif
+	#include "soc/soc.h"
+	#include "soc/rtc_cntl_reg.h"
+	#include <analogWrite.h>
+	#if defined(USE_TRACE)
+		#define LED_BUILTIN 4
+		HardwareSerial mySerial2(2);	// TX:17  RX:16
+	#else
+		#define LED_BUILTIN 4		// 17 -> Serial2 
+	#endif
 #endif
 
 #if defined(ESP32)
@@ -323,22 +323,27 @@ void setup(){
 		delay(1000);        // delay mill sec 1000 [ms]
 
 		bool wait_f=true;
-		int waint_cnt = 5;
+		int waint_cnt = 5000;
+
+		#define TEST_QUAT_DISP
 
 		while(1){
 			if(sen_init==true){
 				//IMU.update();
 				sensors.updateIMU();
 
-				Serial.print("W:");
-				Serial.print(sensors.cimu_.quat[0]);  // W
-				Serial.print(" ,X:");
-				Serial.print(sensors.cimu_.quat[1]);  // X
-				Serial.print(" ,Y:");
-				Serial.print(sensors.cimu_.quat[2]);  // Y
-				Serial.print(" ,Z:");
-				Serial.print(sensors.cimu_.quat[3]);  // Z
-				Serial.print("\n");
+				#if defined(TEST_QUAT_DISP)
+					Serial.print("W:");
+					Serial.print(sensors.cimu_.quat[0]);  // W
+					Serial.print(" ,X:");
+					Serial.print(sensors.cimu_.quat[1]);  // X
+					Serial.print(" ,Y:");
+					Serial.print(sensors.cimu_.quat[2]);  // Y
+					Serial.print(" ,Z:");
+					Serial.print(sensors.cimu_.quat[3]);  // Z
+					Serial.print("\n");
+				#endif
+
 				if(wait_f==true){
 					if(waint_cnt<=0)
 						while(1) delay(1000);        //
@@ -689,11 +694,11 @@ void loop_main(){
 			q[2] = 0.0f;							// qy
 			q[3] = sign(yaw_est) * sin(abs(yaw_est) / 2.0f);	// gz
 		#else
-			bool ok =true;
+			bool ok =false;
 			if(sen_init==true){
 				portENTER_CRITICAL(&mutex);
 				// get IMU data
-				imu_msg = sensors.getIMU();
+				sensors.getIMU(imu_msg);
 				portEXIT_CRITICAL(&mutex);
 
 				q[0] = imu_msg.orientation.w;
@@ -701,14 +706,15 @@ void loop_main(){
 				//q[2] = imu_msg.orientation.y - 0.013;	// ロボットの前傾を調整。 adjust verical angle IMU
 				q[2] = imu_msg.orientation.y;	// ロボットの前傾 そのまま。 2022.10.28
 				q[3] = imu_msg.orientation.z;
-			}
-			// add by nishi 2025.1.25
-			else{
-				// compute quaternion by moter
-				q[0] = cos(abs(yaw_est) / 2.0f);		// qw
-				q[1] = 0.0f;							// qx
-				q[2] = 0.0f;							// qy
-				q[3] = sign(yaw_est) * sin(abs(yaw_est) / 2.0f);	// gz
+
+				// DEBUG
+				double roll,pitch,yaw;
+				foxbot3::QuaternionToEulerAngles(q,roll,pitch,yaw);
+				debug_right.x = roll;
+				debug_right.y = pitch;
+				debug_right.z = yaw;
+				//debug_right.z = pwmMotorRight;
+
 			}
 
 			//SERIAL_PORT.print(F("q[0]:"));
@@ -765,7 +771,7 @@ void loop_main(){
 
 			dx1 = linear_velocity_est * dt;
 			dy1 = 0.0;
-			dz1=0.0;
+			dz1 = 0.0;
 
 			dlt[0]=cb.dt[0][0]*dx1+cb.dt[0][1]*dy1+cb.dt[0][2]*dz1;
 			dlt[1]=cb.dt[1][0]*dx1+cb.dt[1][1]*dy1+cb.dt[1][2]*dz1;
@@ -791,39 +797,42 @@ void loop_main(){
 		#endif
 
 		// feed odom message
-		//odom.header.stamp = nh.now();
-		odom.header.stamp.sec = tv.tv_sec;
-		odom.header.stamp.nanosec = tv.tv_nsec;
+		//odom_.header.stamp = nh.now();
+		odom_.header.stamp.sec = tv.tv_sec;
+		odom_.header.stamp.nanosec = tv.tv_nsec;
 		updateOdometry();
-		//odom.header.frame_id = "odom";
-		//odom.child_frame_id = "base_footprint";
-		odom.pose.pose.position.x += dx;
-		odom.pose.pose.position.y += dy;
-		//odom.pose.pose.position.z = 0.0;
-		odom.pose.pose.position.z += dz;
-		odom.pose.pose.orientation.w = q[0];
-		odom.pose.pose.orientation.x = q[1];
-		odom.pose.pose.orientation.y = q[2];
-		odom.pose.pose.orientation.z = q[3];
+		//odom_.header.frame_id = "odom";
+		//odom_.child_frame_id = "base_footprint";
+		// set postion
+		odom_.pose.pose.position.x += dx;
+		odom_.pose.pose.position.y += dy;
+		odom_.pose.pose.position.z = 0.0;
+		// 下記は、しばらく止めます。 by nishi 2025.3.18
+		//odom_.pose.pose.position.z += dz;
+		// set pose
+		odom_.pose.pose.orientation.w = q[0];
+		odom_.pose.pose.orientation.x = q[1];
+		odom_.pose.pose.orientation.y = q[2];
+		odom_.pose.pose.orientation.z = q[3];
 		// Velocity expressed in base_link frame
-		odom.twist.twist.linear.x = linear_velocity_est;
-		odom.twist.twist.linear.y = 0.0f;
-		odom.twist.twist.angular.z = angular_velocity_est;
+		odom_.twist.twist.linear.x = linear_velocity_est;
+		odom_.twist.twist.linear.y = 0.0f;
+		odom_.twist.twist.angular.z = angular_velocity_est;
 
 		//#define TEST_10_x1
 		#if defined(TEST_10_x1)
 			SERIAL_PORT.print(F("x:"));
-			SERIAL_PORT.print(odom.pose.pose.position.x*10000.0, 8);
+			SERIAL_PORT.print(odom_.pose.pose.position.x*10000.0, 8);
 			SERIAL_PORT.print(F(" y"));
-			SERIAL_PORT.print(odom.pose.pose.position.y*10000.0, 8);
+			SERIAL_PORT.print(odom_.pose.pose.position.y*10000.0, 8);
 			SERIAL_PORT.print(F(" z:"));
-			SERIAL_PORT.println(odom.pose.pose.position.z*10000.0, 8);
+			SERIAL_PORT.println(odom_.pose.pose.position.z*10000.0, 8);
 		#endif
 
 		// error occured -> [ERROR] [1616575654.217167]: Message from device dropped: message larger than buffer.  by nishi
-		//odom.header.stamp = nh.now();
+		//odom_.header.stamp = nh.now();
     	//odom_pub.publish(&odom);
-		RCSOFTCHECK_PROC("loop_main() :#1 odom_publish",rcl_publish(&odom_publisher, &odom, NULL));
+		RCSOFTCHECK_PROC("loop_main() :#1 odom_publish",rcl_publish(&odom_publisher, &odom_, NULL));
 
 		// add by nishi 2022.9.9
 		// use_tf_static==true : publist tf odom -> base_footprint 
@@ -831,9 +840,10 @@ void loop_main(){
 			// add by nishi for TF  2021.4.26
 			// odometry tf
 			//updateTF(odom_tf);
-			updateTF(tf_message->transforms.data[0]);
+			// changed by nishi 2025.3.18
+			updateTF(tf_message->transforms.data[0], odom_);
 			//odom_tf.header.stamp = nh.now();
-			//odom_tf.header.stamp = odom.header.stamp;
+			//odom_tf.header.stamp = odom_.header.stamp;
 
 			// set time stamp
 		    tf_message->transforms.data[0].header.stamp.nanosec = tv.tv_nsec;
@@ -857,7 +867,7 @@ void loop_main(){
 		// joint states
 		updateJointStates();
 		//joint_states.header.stamp = nh.now();
-		//joint_states.header.stamp = odom.header.stamp;
+		//joint_states.header.stamp = odom_.header.stamp;
 
 		//joint_states_pub.publish(&joint_states);
 
@@ -885,12 +895,13 @@ void loop_main(){
 		if(use_imu_pub==true){
 	    	publishImuMsg();
 		}
-		#ifdef USE_MAG
+		#if defined(USE_MAG_X)
 		    publishMagMsg();
 		#endif
 
 		#if defined(USE_DEBUG)
 			RCSOFTCHECK_PROC("loop_main() :#3 debug_left_publish",rcl_publish(&debug_left_publisher, &debug_left, NULL));
+			RCSOFTCHECK_PROC("loop_main() :#4 debug_right_publish",rcl_publish(&debug_right_publisher, &debug_right, NULL));
 		#endif
 
 	    tTime[3] = t + (1000000UL / FREQUENCY_IMU_PUBLISH_HZ);
@@ -920,7 +931,9 @@ void commandVelocityCallback(const void *cmd_vel_msg){
 	const geometry_msgs__msg__Twist * msg = (const geometry_msgs__msg__Twist *)cmd_vel_msg;
 	// if velocity in x direction is 0 turn off LED, if 1 turn on LED
 	//digitalWrite(LED_PIN, (msg->linear.x == 0) ? LOW : HIGH);
-	if(state == AGENT_CONNECTED && beat_ok==true){
+	//if(state == AGENT_CONNECTED && beat_ok==true){
+	// changed by nishi 2025.3.20
+	if(state == AGENT_CONNECTED && beat_ok==true && debug_left.data >= IMU_DATA_RATE_THRES){
 		linear_velocity_ref  = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->linear.x;
 		angular_velocity_ref = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->angular.z;
 	}
@@ -1045,6 +1058,9 @@ bool create_entities()
 				fox_beat_topic_name));
 	#endif
 
+	// add by nishi 2025.3.20
+	debug_left.data=0;
+
 	#if defined(USE_DEBUG)
 		// create publisher for "debug_left"
 		RCCHECK_PROC("create_entities() #9 : init debug_left_publisher",
@@ -1054,6 +1070,15 @@ bool create_entities()
 				//odom_type_support,
 				ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt32), 
 				debug_left_topic_name));
+		RCCHECK_PROC("create_entities() #10 : init debug_right_publisher",
+			rclc_publisher_init_best_effort(
+				&debug_right_publisher, 
+				&node,
+				//odom_type_support,
+				//ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt32), 
+				ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3), 
+				//ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Quaternion), 
+				debug_right_topic_name));
 	#endif
 
 	// create subscriber for Twist "cmd_vel"
@@ -1128,6 +1153,7 @@ void destroy_entities()
 
   #if defined(USE_DEBUG)
     rc=rcl_publisher_fini(&debug_left_publisher, &node);
+    rc=rcl_publisher_fini(&debug_right_publisher, &node);
   #endif
 
   rc=rcl_subscription_fini(&cmd_vel_subscriber, &node);
@@ -1145,6 +1171,7 @@ void destroy_entities()
 void update_motor(void *pvParameters){
 
 	int ac_cnt2=0;
+	int ac_cnt3=0;
 	clock_t t_start2 ,t_end2;
 
 	while(1){
@@ -1273,18 +1300,20 @@ void update_motor(void *pvParameters){
 	    if (t >= tTime[6]){
 			//Serial.println("start update_imu()");
 			if(sen_init==true){
-				// changed by nishi 2025.3.7
+				// IMU device へのデータアクセスを行う。
 				if(sensors.updateIMU()==true){
-					// dmp9 で、どれくらい成功しているか、カウントする?
 					ac_cnt2++;
 					portENTER_CRITICAL(&mutex);
+					// dmp9 で、どれくらい成功しているか、カウントする?
+					// Turtlebot3Sensor Object へデータをコピー
 					sensors.copyIMU();
 					portEXIT_CRITICAL(&mutex);
 				}
 			}
 			#if defined(IMU_SENSER6)
 				//                                    無負荷時  /  Madgwick時 / DMP6時  / DMP6 + Acc
-				tTime[6] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);	// 実測 99[Hz]	有効実測 55[Hz] changed by nishi 2025.1.26
+				//tTime[6] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);	// 実測 99[Hz]	有効実測 55[Hz] changed by nishi 2025.1.26
+				tTime[6] = t + (1000000UL / 55);	// 実測 99[Hz]	有効実測 51[Hz] changed by nishi 2025.3.21
 				//tTime[6] = t + 1000000UL / 100;   //    
 				//tTime[6] = t + 1000000UL / 250;   //    
 				//tTime[6] = t + 1000000UL / 400;   //        /  206        /   205     /
@@ -1317,16 +1346,38 @@ void update_motor(void *pvParameters){
 			}
 		#endif
 
-		#if defined(USE_DEBUG)
-		  if (t >= tTime[9]){
-				//SERIAL_PORT.print(F("acc_hz:"));
-				//SERIAL_PORT.println(hz, 4);
-				float hz = (float)ac_cnt2/4;
-				debug_left.data = (int32_t)hz;
-				ac_cnt2=0;
-				tTime[9] = t + 1000000UL * 4;   // 4[sec]
+		// DMP のデータ監視を行う!!
+		if (t >= tTime[9]){
+			//SERIAL_PORT.print(F("acc_hz:"));
+			//SERIAL_PORT.println(hz, 4);
+			float hz = (float)ac_cnt2/4;
+			debug_left.data = (int32_t)hz;
+
+			//float hz3 = (float)ac_cnt3/4;
+			//float hz3 = (float)lp_cnt3_/4;
+			//debug_right.data = (int32_t)hz3;
+
+			// add by nishi 2025.3.20
+			if(debug_left.data >= IMU_DATA_RATE_THRES){
+				#if defined(BOARD_ESP32)
+					//pinMode(LED_PIN, OUTPUT);
+					digitalWrite(LED_PIN, LOW);  // light OFF
+				#endif
 			}
-		#endif
+			else{
+				// stop moter drive
+				linear_velocity_ref=0.0;
+				angular_velocity_ref=0.0;
+				#if defined(BOARD_ESP32)
+					//pinMode(LED_PIN, OUTPUT);
+					digitalWrite(LED_PIN, HIGH);  // light ON
+				#endif
+			}
+			ac_cnt2=0;
+			ac_cnt3=0;
+			
+			tTime[9] = t + 1000000UL * 4;   // 4[sec]
+		}
 
 		//delay(1);
 		//vTaskDelay(1);
@@ -1495,7 +1546,7 @@ void publishImuMsg(void)
 {
 	// add by nishi 2025.3.9
 	portENTER_CRITICAL(&mutex);
-	imu_msg = sensors.getIMU();
+	sensors.getIMU(imu_msg);
 	// add by nishi 2025.3.9
 	portEXIT_CRITICAL(&mutex);
 
@@ -1509,19 +1560,19 @@ void publishImuMsg(void)
 
 }
 
-#ifdef USE_MAG
-	/*******************************************************************************
-	* Publish msgs (Magnetic data)
-	*******************************************************************************/
-	void publishMagMsg(void)
-	{
+#if defined(USE_MAG_X)
+/*******************************************************************************
+* Publish msgs (Magnetic data)
+*******************************************************************************/
+void publishMagMsg(void)
+{
 	mag_msg = sensors.getMag();
 
 	mag_msg.header.stamp    = rosNow();
 	mag_msg.header.frame_id = mag_frame_id;
 
 	mag_pub.publish(&mag_msg);
-	}
+}
 #endif
 
 /*******************************************************************************
@@ -1694,22 +1745,22 @@ void updateTFPrefix(bool isConnected)
 *******************************************************************************/
 void updateOdometry(void)
 {
-  odom.header.frame_id.data = odom_header_frame_id;
+  odom_.header.frame_id.data = odom_header_frame_id;
   // 此処は、後で見直し。 by nishi 2022.10.23
-  odom.header.frame_id.size = strlen(odom_header_frame_id);
-  odom.header.frame_id.capacity = sizeof(odom_header_frame_id);
-  odom.child_frame_id.data  = odom_child_frame_id;
+  odom_.header.frame_id.size = strlen(odom_header_frame_id);
+  odom_.header.frame_id.capacity = sizeof(odom_header_frame_id);
+  odom_.child_frame_id.data  = odom_child_frame_id;
   // 此処は、後で見直し。 by nishi 2022.10.23
-  odom.child_frame_id.size = strlen(odom_child_frame_id);
-  odom.child_frame_id.capacity = sizeof(odom_child_frame_id);
+  odom_.child_frame_id.size = strlen(odom_child_frame_id);
+  odom_.child_frame_id.capacity = sizeof(odom_child_frame_id);
 
-  //odom.pose.pose.position.x = odom_pose[0];
-  //odom.pose.pose.position.y = odom_pose[1];
-  //odom.pose.pose.position.z = 0;
-  //odom.pose.pose.orientation = tf::createQuaternionFromYaw(odom_pose[2]);
+  //odom_.pose.pose.position.x = odom_pose[0];
+  //odom_.pose.pose.position.y = odom_pose[1];
+  //odom_.pose.pose.position.z = 0;
+  //odom_.pose.pose.orientation = tf::createQuaternionFromYaw(odom_pose[2]);
 
-  //odom.twist.twist.linear.x  = odom_vel[0];
-  //odom.twist.twist.angular.z = odom_vel[2];
+  //odom_.twist.twist.linear.x  = odom_vel[0];
+  //odom_.twist.twist.angular.z = odom_vel[2];
 
 }
 /*******************************************************************************
@@ -1742,16 +1793,17 @@ void updateJointStates(void)
 * CalcUpdateulate the TF
 *******************************************************************************/
 //void updateTF(geometry_msgs::TransformStamped& odom_tf)
-void updateTF(geometry_msgs__msg__TransformStamped& odom_tf)
+//void updateTF(geometry_msgs__msg__TransformStamped& odom_tf)
+// changed by nishi 2025.3.18
+void updateTF(geometry_msgs__msg__TransformStamped& odom_tf,nav_msgs__msg__Odometry& odom)
 {
-  //odom_tf.header = odom.header;	// odom or odom_fox
-  //odom_tf.child_frame_id = odom.child_frame_id;	// base_footprint
+  //odom_tf.header = odom_.header;	// odom or odom_fox
+  //odom_tf.child_frame_id = odom_.child_frame_id;	// base_footprint
   odom_tf.transform.translation.x = odom.pose.pose.position.x;
   odom_tf.transform.translation.y = odom.pose.pose.position.y;
   odom_tf.transform.translation.z = odom.pose.pose.position.z;
   odom_tf.transform.rotation      = odom.pose.pose.orientation;
 }
-
 
 /*******************************************************************************
 * Update motor information
@@ -1799,24 +1851,24 @@ void initOdom(void)
 {
   init_encoder = true;
 
-  #ifdef USE_ROS1
+  #if defined(USE_ROS1)
   for (int index = 0; index < 3; index++)
   {
     odom_pose[index] = 0.0;
     odom_vel[index]  = 0.0;
   }
 
-  odom.pose.pose.position.x = 0.0;
-  odom.pose.pose.position.y = 0.0;
-  odom.pose.pose.position.z = 0.0;
+  odom_.pose.pose.position.x = 0.0;
+  odom_.pose.pose.position.y = 0.0;
+  odom_.pose.pose.position.z = 0.0;
 
-  odom.pose.pose.orientation.x = 0.0;
-  odom.pose.pose.orientation.y = 0.0;
-  odom.pose.pose.orientation.z = 0.0;
-  odom.pose.pose.orientation.w = 1.0;
+  odom_.pose.pose.orientation.x = 0.0;
+  odom_.pose.pose.orientation.y = 0.0;
+  odom_.pose.pose.orientation.z = 0.0;
+  odom_.pose.pose.orientation.w = 1.0;
 
-  odom.twist.twist.linear.x  = 0.0;
-  odom.twist.twist.angular.z = 0.0;
+  odom_.twist.twist.linear.x  = 0.0;
+  odom_.twist.twist.angular.z = 0.0;
 
   motor_tic.left=0;		// add by nishi
   motor_tic.right=0;	// add by nishi

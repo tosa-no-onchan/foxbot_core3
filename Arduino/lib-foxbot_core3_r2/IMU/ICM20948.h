@@ -30,16 +30,16 @@
 	// add by nishi
 	#define USE_SPARK_LIB
 	// 有効にする。 by nishi 2025.3.9
-	//#define USE_ACC_NISHI
+	#define USE_ACC_NISHI
 	// 有効にする。 by nishi 2025.3.9
-	//#define USE_GRYO_NISHI
-	#define USE_DMP_NISHI
-	//#define USE_MADWICK
+	#define USE_GRYO_NISHI
+	//#define USE_DMP_NISHI
+	#define USE_MADWICK
 
 	// add by nishi 2021.10.7
-	//#define IMU_SENSER6		// 9軸の時は、コメントにする。
-	//#define USE_MAG
+	#define IMU_SENSER6		// 9軸の時は、コメントにする。
 
+	#define USE_MAG
 	#define USE_ACC_2G
 	//#define USE_ACC_4G
 	//#define USE_ACC_8G
@@ -48,19 +48,24 @@
 #else
 	// add by nishi
 	#define USE_SPARK_LIB
-	//#define USE_ACC_NISHI
-	//#define USE_GRYO_NISHI
-	#define USE_DMP_NISHI
-	//#define USE_MADWICK
+	#define USE_ACC_NISHI
+	#define USE_GRYO_NISHI
+	//#define USE_DMP_NISHI
+	#define USE_MADWICK
 
 	// add by nishi 2021.10.7
-	//#define IMU_SENSER6		// 9軸の時は、コメントにする。
-	//#define USE_MAG
+	#define IMU_SENSER6		// 9軸の時は、コメントにする。
 
+	#define USE_MAG
 	#define USE_ACC_2G
 	//#define USE_ACC_4G
 	//#define USE_ACC_8G
 #endif
+
+// add by nishi 2025.3.24
+#define MPU_CALI_COUNT_GYRO 100
+#define MPU_CALI_COUNT_ACC 100
+#define MPU_CALI_COUNT_MAG 100
 
 // Full-Scale Range
 //  ACCEL_FS=0  -> ±2 [G]
@@ -174,12 +179,8 @@
 
 #endif
 
-
-#if defined(USE_SPARK_LIB)
-	#include <ICM_20948.h>  		// Click here to get the library: http://librarymanager/All#SparkFun_ICM_20948_IMU
-#else
-	//#include "ICM20948_spi.h"		// not use
-#endif
+// SparkFun_ICM-20948_ArduinoLibrary
+#include <ICM_20948.h>  		// Click here to get the library: http://librarymanager/All#SparkFun_ICM_20948_IMU
 
 //#define MPU_SPI   SPI_IMU
 // changed by nishi
@@ -200,9 +201,9 @@
 	#define SERIAL_PORT Serial
 #endif
 
-
+//  SPARK LIB  use
 // for ICM_20948.h
-#if defined(USE_SPARK_LIB)
+//#if defined(USE_SPARK_LIB)
 	#define USE_SPI       // Uncomment this to use SPI
 
 	//#define SPI_PORT SPI // Your desired SPI port.       Used only when "USE_SPI" is defined
@@ -214,7 +215,7 @@
 	#define AD0_VAL 1      // The value of the last bit of the I2C address.                \
 						// On the SparkFun 9DoF IMU breakout the default is 1, and when \
 						// the ADR jumper is closed the value becomes 0
-#endif
+//#endif
 
 /** Macro for micro tesla (uT) per LSB (1 LSB = 0.1uT) */
 #define MAG_UT_LSB      (0.15F)
@@ -254,12 +255,13 @@ public:
 
 	char calibratingG_f;
 	char calibratingA_f;
+	char calibratingM_f;
 	char calibratingD_f;
 
 	// AK8963 get calibration data
 	int16_t AK8963_ASA[3];
 
-	double quat[4];		// add by nishi
+	double quat[4]={1.0, 0.0, 0.0, 0.0};		// add by nishi
 	//int32_t quatRAW[4];		// add by nishi
 	double quatRAW[4];		// changed by nishi 2025.3.14
 	//int32_t quatZero[4];		// add by nishi
@@ -276,8 +278,6 @@ public:
 	float mRes = 0.15; // Sensitivity Scale Factor = 0.15
 	float zero_off;
 
-	#ifndef USE_SPARK_LIB
-	#endif
 
 public:
 	cICM20948();
@@ -309,11 +309,7 @@ public:
 	bool mag_cali_get_done();
 
 private:
-	#if defined(USE_SPARK_LIB)
-		ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
-	#else
-		cICM20948_spi _spi;
-	#endif
+	ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
 
 	float invSqrt(float x);
 };

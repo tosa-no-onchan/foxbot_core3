@@ -57,7 +57,30 @@ uint8_t Turtlebot3Sensor::init(unsigned long baud)
   //battery_state_msg_.design_capacity = NAN;
   //battery_state_msg_.percentage      = NAN;
 
+
   get_error_code = cimu_.begin(206);
+
+  // add by nishi 2025.3.20
+  quat_[0] = cimu_.quat[0];
+  quat_[1] = cimu_.quat[1];
+  quat_[2] = cimu_.quat[2];
+  quat_[3] = cimu_.quat[3];
+
+  // add by nishi 2025.3.17
+  gyroADC_[0] = cimu_.SEN.gyroADC[0];
+  gyroADC_[1] = cimu_.SEN.gyroADC[1];
+  gyroADC_[2] = cimu_.SEN.gyroADC[2];
+
+  // add by nishi 2025.3.17
+  accADC_[0] = cimu_.SEN.accADC[0];
+  accADC_[1] = cimu_.SEN.accADC[1];
+  accADC_[2] = cimu_.SEN.accADC[2];
+
+  // add by nishi 2025.3.17
+  magADC_[0] = cimu_.SEN.magADC[0];
+  magADC_[1] = cimu_.SEN.magADC[1];
+  magADC_[2] = cimu_.SEN.magADC[2];
+  
 
   #ifdef DEBUG_N
   if (get_error_code != 0x00)
@@ -76,19 +99,115 @@ uint8_t Turtlebot3Sensor::initIMU(void){
 #define LED_BUILTIN 17
 //#define LED_BUILTIN 4
 
-//void Turtlebot3Sensor::updateIMU(void){
-// chnaged by nishi 2025.37
+/*
+* IMU device へのデータアクセスを行う。
+* cIMU::update() -> cIMU::computeIMU()
+* 取り込まれたデータは、cIMU クラス の 各public 変数に保存される。
+*/
 bool Turtlebot3Sensor::updateIMU(void){
     //cimu_.update();
     // changed by nishi 2025.3.7
     return cimu_.update();
 }
 
+/*
+* cIMU インスタンス へ取り込まれた IMU データを、一括して、自クラスへコピーする。
+*/
 void Turtlebot3Sensor::copyIMU(void){
-  quat[0]=cimu_.quat[0];
-  quat[1]=cimu_.quat[1];
-  quat[2]=cimu_.quat[2];
-  quat[3]=cimu_.quat[3];
+  quat_[0]=cimu_.quat[0];
+  quat_[1]=cimu_.quat[1];
+  quat_[2]=cimu_.quat[2];
+  quat_[3]=cimu_.quat[3];
+
+  // add by nishi 2025.3.17
+  gyroADC_[0] = cimu_.SEN.gyroADC[0];
+  gyroADC_[1] = cimu_.SEN.gyroADC[1];
+  gyroADC_[2] = cimu_.SEN.gyroADC[2];
+
+  // add by nishi 2025.3.17
+  accADC_[0] = cimu_.SEN.accADC[0];
+  accADC_[1] = cimu_.SEN.accADC[1];
+  accADC_[2] = cimu_.SEN.accADC[2];
+
+  // add by nishi 2025.3.17
+  magADC_[0] = cimu_.SEN.magADC[0];
+  magADC_[1] = cimu_.SEN.magADC[1];
+  magADC_[2] = cimu_.SEN.magADC[2];
+
+}
+
+/*
+* copyIMU() で、一括コピーした自クラス上のデータをコール元へ渡す。
+*/
+//sensor_msgs::Imu Turtlebot3Sensor::getIMU(void)
+void Turtlebot3Sensor::getIMU(sensor_msgs__msg__Imu &imu_msg)
+{
+  //imu_msg_.angular_velocity.x = cimu_.SEN.gyroADC[0] * GYRO_FACTOR;
+  imu_msg.angular_velocity.x = gyroADC_[0] * GYRO_FACTOR;
+  //imu_msg_.angular_velocity.y = cimu_.SEN.gyroADC[1] * GYRO_FACTOR;
+  imu_msg.angular_velocity.y = gyroADC_[1] * GYRO_FACTOR;
+  //imu_msg_.angular_velocity.z = cimu_.SEN.gyroADC[2] * GYRO_FACTOR;
+  imu_msg.angular_velocity.z = gyroADC_[2] * GYRO_FACTOR;
+
+  imu_msg.angular_velocity_covariance[0] = 0.02;
+  imu_msg.angular_velocity_covariance[1] = 0;
+  imu_msg.angular_velocity_covariance[2] = 0;
+  imu_msg.angular_velocity_covariance[3] = 0;
+  imu_msg.angular_velocity_covariance[4] = 0.02;
+  imu_msg.angular_velocity_covariance[5] = 0;
+  imu_msg.angular_velocity_covariance[6] = 0;
+  imu_msg.angular_velocity_covariance[7] = 0;
+  imu_msg.angular_velocity_covariance[8] = 0.02;
+
+  //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR;
+  //imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR;
+  //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
+
+  // MPU6500
+  //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR - 2.65;
+  //imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR + 0.8;
+  //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
+
+  // ICM-20948
+  //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR;
+  imu_msg.linear_acceleration.x = accADC_[0] * ACCEL_FACTOR;
+  //imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR;
+  imu_msg.linear_acceleration.y = accADC_[1] * ACCEL_FACTOR;
+  //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
+  imu_msg.linear_acceleration.z = accADC_[2] * ACCEL_FACTOR;
+
+  imu_msg.linear_acceleration_covariance[0] = 0.04;
+  imu_msg.linear_acceleration_covariance[1] = 0;
+  imu_msg.linear_acceleration_covariance[2] = 0;
+  imu_msg.linear_acceleration_covariance[3] = 0;
+  imu_msg.linear_acceleration_covariance[4] = 0.04;
+  imu_msg.linear_acceleration_covariance[5] = 0;
+  imu_msg.linear_acceleration_covariance[6] = 0;
+  imu_msg.linear_acceleration_covariance[7] = 0;
+  imu_msg.linear_acceleration_covariance[8] = 0.04;
+
+  //imu_msg_.orientation.w = cimu_.quat[0];
+  //imu_msg_.orientation.x = cimu_.quat[1];
+  //imu_msg_.orientation.y = cimu_.quat[2];
+  //imu_msg_.orientation.z = cimu_.quat[3];
+
+  // MPU6500 & ICM-20948
+  imu_msg.orientation.w = quat_[0];
+  imu_msg.orientation.x = quat_[1];
+  imu_msg.orientation.y = quat_[2];
+  imu_msg.orientation.z = quat_[3];
+
+  imu_msg.orientation_covariance[0] = 0.0025;
+  imu_msg.orientation_covariance[1] = 0;
+  imu_msg.orientation_covariance[2] = 0;
+  imu_msg.orientation_covariance[3] = 0;
+  imu_msg.orientation_covariance[4] = 0.0025;
+  imu_msg.orientation_covariance[5] = 0;
+  imu_msg.orientation_covariance[6] = 0;
+  imu_msg.orientation_covariance[7] = 0;
+  imu_msg.orientation_covariance[8] = 0.0025;
+
+  //return imu_msg_;
 }
 
 void Turtlebot3Sensor::calibrationGyro()
@@ -119,90 +238,32 @@ void Turtlebot3Sensor::calibrationGyro()
   }
 }
 
-
-//sensor_msgs::Imu Turtlebot3Sensor::getIMU(void)
-sensor_msgs__msg__Imu Turtlebot3Sensor::getIMU(void)
+//float* Turtlebot3Sensor::getOrientation(void)
+void Turtlebot3Sensor::getOrientation(double *orientation)
 {
-  imu_msg_.angular_velocity.x = cimu_.SEN.gyroADC[0] * GYRO_FACTOR;
-  imu_msg_.angular_velocity.y = cimu_.SEN.gyroADC[1] * GYRO_FACTOR;
-  imu_msg_.angular_velocity.z = cimu_.SEN.gyroADC[2] * GYRO_FACTOR;
-  imu_msg_.angular_velocity_covariance[0] = 0.02;
-  imu_msg_.angular_velocity_covariance[1] = 0;
-  imu_msg_.angular_velocity_covariance[2] = 0;
-  imu_msg_.angular_velocity_covariance[3] = 0;
-  imu_msg_.angular_velocity_covariance[4] = 0.02;
-  imu_msg_.angular_velocity_covariance[5] = 0;
-  imu_msg_.angular_velocity_covariance[6] = 0;
-  imu_msg_.angular_velocity_covariance[7] = 0;
-  imu_msg_.angular_velocity_covariance[8] = 0.02;
+  //static float orientation[4];
 
-  //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR;
-  //imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR;
-  //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
+  //orientation[0] = cimu_.quat[0];
+  orientation[0] = quat_[0];
+  //orientation[1] = cimu_.quat[1];
+  orientation[1] = quat_[1];
+  //orientation[2] = cimu_.quat[2];
+  orientation[2] = quat_[2];
+  //orientation[3] = cimu_.quat[3];
+  orientation[3] = quat_[3];
 
-  // MPU6500
-  //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR - 2.65;
-  //imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR + 0.8;
-  //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
-
-  // ICM-20948
-  imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR;
-  imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR;
-  imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
-
-  imu_msg_.linear_acceleration_covariance[0] = 0.04;
-  imu_msg_.linear_acceleration_covariance[1] = 0;
-  imu_msg_.linear_acceleration_covariance[2] = 0;
-  imu_msg_.linear_acceleration_covariance[3] = 0;
-  imu_msg_.linear_acceleration_covariance[4] = 0.04;
-  imu_msg_.linear_acceleration_covariance[5] = 0;
-  imu_msg_.linear_acceleration_covariance[6] = 0;
-  imu_msg_.linear_acceleration_covariance[7] = 0;
-  imu_msg_.linear_acceleration_covariance[8] = 0.04;
-
-  //imu_msg_.orientation.w = cimu_.quat[0];
-  //imu_msg_.orientation.x = cimu_.quat[1];
-  //imu_msg_.orientation.y = cimu_.quat[2];
-  //imu_msg_.orientation.z = cimu_.quat[3];
-
-  // MPU6500 & ICM-20948
-  imu_msg_.orientation.w = quat[0];
-  imu_msg_.orientation.x = quat[1];
-  imu_msg_.orientation.y = quat[2];
-  imu_msg_.orientation.z = quat[3];
-
-
-  imu_msg_.orientation_covariance[0] = 0.0025;
-  imu_msg_.orientation_covariance[1] = 0;
-  imu_msg_.orientation_covariance[2] = 0;
-  imu_msg_.orientation_covariance[3] = 0;
-  imu_msg_.orientation_covariance[4] = 0.0025;
-  imu_msg_.orientation_covariance[5] = 0;
-  imu_msg_.orientation_covariance[6] = 0;
-  imu_msg_.orientation_covariance[7] = 0;
-  imu_msg_.orientation_covariance[8] = 0.0025;
-
-  return imu_msg_;
-}
-
-float* Turtlebot3Sensor::getOrientation(void)
-{
-  static float orientation[4];
-
-  orientation[0] = cimu_.quat[0];
-  orientation[1] = cimu_.quat[1];
-  orientation[2] = cimu_.quat[2];
-  orientation[3] = cimu_.quat[3];
-
-  return orientation;
+  //return orientation;
 }
 
 //sensor_msgs::MagneticField Turtlebot3Sensor::getMag(void)
 sensor_msgs__msg__MagneticField Turtlebot3Sensor::getMag(void)
 {
-  mag_msg_.magnetic_field.x = cimu_.SEN.magADC[0] * MAG_FACTOR;
-  mag_msg_.magnetic_field.y = cimu_.SEN.magADC[1] * MAG_FACTOR;
-  mag_msg_.magnetic_field.z = cimu_.SEN.magADC[2] * MAG_FACTOR;
+  //mag_msg_.magnetic_field.x = cimu_.SEN.magADC[0] * MAG_FACTOR;
+  mag_msg_.magnetic_field.x = magADC_[0] * MAG_FACTOR;
+  //mag_msg_.magnetic_field.y = cimu_.SEN.magADC[1] * MAG_FACTOR;
+  mag_msg_.magnetic_field.y = magADC_[1] * MAG_FACTOR;
+  //mag_msg_.magnetic_field.z = cimu_.SEN.magADC[2] * MAG_FACTOR;
+  mag_msg_.magnetic_field.z = magADC_[2] * MAG_FACTOR;
 
   mag_msg_.magnetic_field_covariance[0] = 0.0048;
   mag_msg_.magnetic_field_covariance[1] = 0;

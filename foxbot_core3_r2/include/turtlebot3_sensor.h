@@ -87,14 +87,19 @@ class Turtlebot3Sensor
   // IMU
   uint8_t initIMU(void);
   //sensor_msgs::Imu getIMU(void);
-  sensor_msgs__msg__Imu getIMU(void);
+  //sensor_msgs__msg__Imu getIMU(void);
+  // changed by nishi 2025.3.18
+  void getIMU(sensor_msgs__msg__Imu &imu_msg);
+
   //void updateIMU(void);
   // changed by nishi 2025.3.6
   bool updateIMU(void);
   void calibrationGyro(void);
   void copyIMU(void);
 
-  float* getOrientation(void);
+  //float* getOrientation(void);
+  // changed by nishi 2025.3.17
+  void getOrientation(double *orientation);
   //sensor_msgs::MagneticField getMag(void);
   sensor_msgs__msg__MagneticField getMag(void);
 
@@ -133,7 +138,7 @@ class Turtlebot3Sensor
 
  private:
   //sensor_msgs::Imu           imu_msg_;
-  sensor_msgs__msg__Imu     imu_msg_;
+  //sensor_msgs__msg__Imu     imu_msg_;
   #if defined NOETIC_SUPPORT
     sensor_msgs::BatteryStateNoetic  battery_state_msg_;
   #else
@@ -147,7 +152,13 @@ class Turtlebot3Sensor
   // changed by nishi
   //OLLO ollo_;
 
-  float quat[4];  // add by nishi 2021.12.25
+  //float quat[4];  // add by nishi 2021.12.25
+  double quat_[4];  // changed by nishi 2025.3.17
+
+  int16_t gyroADC_[3]; // add by nishi 2025.3.17
+  int16_t accADC_[3]; // add by nishi 2025.3.17
+  float magADC_[3];  // add by nishi 2025.3.17
+
 
   LedPinArray led_pin_array_;
   SonarPin sonar_pin_;

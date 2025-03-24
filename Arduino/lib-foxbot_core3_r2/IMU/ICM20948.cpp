@@ -86,7 +86,6 @@ cICM20948::cICM20948()
 }
 
 
-#if defined(USE_SPARK_LIB)
 bool cICM20948::begin()
 {
   int cnt;
@@ -177,7 +176,7 @@ bool cICM20948::begin()
     }
     //MPU_SPI.setClockDivider( SPI_CLOCK_DIV4 ); // 6.5MHz
   }
-  // add byy nishi
+  // add by nishi
   else{
     SERIAL_PORT.print("cICM20948::begin(): #1 whoami=");
     SERIAL_PORT.println(whoami, HEX);
@@ -189,87 +188,6 @@ bool cICM20948::begin()
   return bConnected;
 }
 
-#else
-bool cICM20948::begin()
-{
-  uint8_t data;
-
-  pinMode( BDPIN_SPI_CS_IMU, OUTPUT );
-
-  //MPU_SPI.begin();
-  // changed by nishi
-  MPU_SPI.begin(18,19,23,5);
-
-  // test by nishi MOSI(23) Pull UP 2023.12.13
-  //pinMode(23,INPUT_PULLUP);
-
-  //MPU_SPI.setDataMode( SPI_MODE3 );
-  MPU_SPI.setDataMode( SPI_MODE0 );   // changed by nishi
-  MPU_SPI.setBitOrder( MSBFIRST );
-
-  // Limit SPI frequency to 7MHz みたい。
-  //#define SPI_CLOCK_DIV2    0x00101001 //8 MHz
-  //#define SPI_CLOCK_DIV4    0x00241001 //4 MHz
-  //#define SPI_CLOCK_DIV8    0x004c1001 //2 MHz
-  //#define SPI_CLOCK_DIV16   0x009c1001 //1 MHz
-  //#define SPI_CLOCK_DIV32   0x013c1001 //500 KHz
-  //#define SPI_CLOCK_DIV64   0x027c1001 //250 KHz
-  //#define SPI_CLOCK_DIV128  0x04fc1001 //125 KHz
-
-  //MPU_SPI.setClockDivider( SPI_CLOCK_DIV128 ); // 108Mhz/128 = 0.8MHz  今までこちらを使用。
-  MPU_SPI.setClockDivider( SPI_CLOCK_DIV4 ); // changed by nishi 2022.5.2
-  digitalWrite(BDPIN_SPI_CS_IMU, HIGH);
-  //delay( 100 );
-  delay( 300 );		// changed by nishi 2021.10.6
-
-  // mICM.sleep(false);
-  data = _spi.spiReadByte(ICM20948_REG_PWR_MGMT_1);
-  data &= 0xff - ICM20948_BIT_SLEEP;
-  // mICM.lowPower(false);
-  data &= 0xff - ICM20948_BIT_LP_EN;
-  _spi.spiWriteByte(ICM20948_REG_PWR_MGMT_1, data);
-
-
-  uint8_t whoami;
-  int i=5;
-  while(i>=0){
-    whoami = _spi.spiReadByte(ICM20948_REG_WHO_AM_I);
-    if(whoami == ICM20948_DEVICE_ID) break;
-    delay(100);
-    i--;
-  }
-  // whoami = 0xEA  -> ICM20948
-  if(whoami == ICM20948_DEVICE_ID)
-  {
-    // Limit SPI frequency to 7MHz みたい。
-    //MPU_SPI.setClockDivider( SPI_CLOCK_DIV4 ); // 4MHz  for ICM20948 これまで使用。 original
-
-    bConnected = true;
-    init();
-    #if defined(USE_GRYO_NISHI)
-      gyro_init();
-    #endif
-    #if defined(USE_ACC_NISHI)
-      acc_init();
-    #endif
-    #if defined(USE_MAG)
-      mag_init();
-    #endif
-
-  }
-  // add by nishi
-  else{
-    SERIAL_PORT.print("cICM20948::begin(): #10 ");
-    SERIAL_PORT.println(whoami, HEX);
-    //while(1){
-    //  delay(100);
-    //}
-  }
-  return bConnected;
-}
-#endif
-
-#if defined(USE_SPARK_LIB)
 bool cICM20948::init( void ){
   uint8_t state;
   uint8_t data;
@@ -402,8 +320,8 @@ bool cICM20948::init( void ){
     SERIAL_PORT.println();
     SERIAL_PORT.println(F("Configuration complete!"));
 
-      // DEBUG by nishi
-      #if defined(DEBUG_NISHI_8)
+    // DEBUG by nishi
+    #if defined(DEBUG_NISHI_8)
       // bank0 USER_CTRL 0x03
       myICM.setBank(0); // myICM.startupMagnetometer(); の後は、Bank が変わる。
       rc_my = myICM.read(0x03, (uint8_t *)&data, sizeof(data));
@@ -413,7 +331,7 @@ bool cICM20948::init( void ){
       while(1){
         delay(100);
       }
-      #endif
+    #endif
     //SERIAL_PORT.println("Please CR!");
     //WAITFORINPUT();
   #endif
@@ -448,6 +366,7 @@ bool cICM20948::init( void ){
     //    INV_ICM20948_SENSOR_GRAVITY                     (32-bit 6-axis quaternion)
     //    INV_ICM20948_SENSOR_LINEAR_ACCELERATION         (16-bit accel + 32-bit 6-axis quaternion)
     //    INV_ICM20948_SENSOR_ORIENTATION                 (32-bit 9-axis quaternion + heading accuracy)
+
 
     // Enable the DMP orientation sensor
     #if !defined(IMU_SENSER6)
@@ -527,59 +446,6 @@ bool cICM20948::init( void ){
   return rc;
 }
 
-#else
-bool cICM20948::init( void )
-{
-  uint8_t state;
-  uint8_t data;
-  uint8_t response[3] = {0, 0, 0};
-  bool rc=true;
-
-
-	//ICM20948 Set Sensors
-  _spi.spiWriteByte(ICM20948_REG_PWR_MGMT_2, 0x00); // Acc/Gyro Enable
-	delay(1);
-
-	//ICM20948 Set SampleRate
-	//SAMPLE_RATE = Internal_Sample_Rate / (1 + SMPLRT_DIV)
-  _spi.spiWriteByte(ICM20948_REG_GYRO_SMPLRT_DIV, 0x00); // 
-	delay(1);
-
-	//ICM20948 Gyro 
-  // Gyro set GYRO_CONFIG_1
-	// Set Full Scale Gyro Range
-  data = ICM20948_GYRO_FULLSCALE_2000DPS;
-  // Set Gyro DLPF
-  //data |= ICM20948_GYRO_BW_51HZ;
-  data |= ICM20948_GYRO_BW_6HZ;     // changed by nishi 2022.4.30
-  _spi.spiWriteByte(ICM20948_REG_GYRO_CONFIG_1, data);
-	delay(1);
-
-	//ICM20948 Accel
-	// Set Full Scale Accel Range
-  #if defined(USE_ACC_2G)
-    data = ICM20948_ACCEL_FULLSCALE_2G;
-  #elif defined(USE_ACC_4G)
-    data = ICM20948_ACCEL_FULLSCALE_4G;   // changed by nishi 2022.4.30
-  #else
-    data = ICM20948_ACCEL_FULLSCALE_8G;
-  #endif
-
-  // Set Accel DLPF
-  //data |= ICM20948_ACCEL_BW_50HZ;
-  data |= ICM20948_ACCEL_BW_6HZ;        // changed by nishi 2022.4.30
-  _spi.spiWriteByte(ICM20948_REG_ACCEL_CONFIG, data);
-	delay(1);
-
-  #if defined(USE_MAG)
-    _spi.AK09916_init();
-  #endif
-  return rc;
-}
-
-#endif
-
-
 void cICM20948::gyro_init( void ){
 	uint8_t i;
 	for( i=0; i<3; i++ ){
@@ -592,7 +458,6 @@ void cICM20948::gyro_init( void ){
 	//calibratingG = MPU_CALI_COUNT;
 }
 
-#if defined(USE_SPARK_LIB)
 void cICM20948::gyro_get_adc( void ){
 	int16_t x = 0;
 	int16_t y = 0;
@@ -609,34 +474,6 @@ void cICM20948::gyro_get_adc( void ){
   gyro_common();
 }
 
-#else
-void cICM20948::gyro_get_adc( void )
-{
-	int16_t x = 0;
-	int16_t y = 0;
-	int16_t z = 0;
-
-  uint8_t rawADC[6];
-
-  if( bConnected == true )
-  {
-    _spi.spiRead(ICM20948_REG_GYRO_XOUT_H_SH, &rawADC[0], 6);
-
- 		x = (((int16_t)rawADC[0]) << 8) | rawADC[1];
-  	y = (((int16_t)rawADC[2]) << 8) | rawADC[3];
-  	z = (((int16_t)rawADC[4]) << 8) | rawADC[5];
-
-  	gyroRAW[0] = x;
-  	gyroRAW[1] = y;
-  	gyroRAW[2] = z;
-
-  	GYRO_ORIENTATION( x, y,z );
-  }
-
-  gyro_common();
-}
-#endif
-
 void cICM20948::gyro_cali_start(){
 	//calibratingG = MPU_CALI_COUNT;
   calibratingG_f = 0;
@@ -648,8 +485,8 @@ void cICM20948::gyro_common(){
 
   if(calibratingG_f == 0){
     calibratingG++;
-    if(calibratingG >= 800){
-      if(calibratingG == 800){
+    if(calibratingG >= MPU_CALI_COUNT_GYRO){
+      if(calibratingG == MPU_CALI_COUNT_GYRO){
         g[0]=0;
         g[1]=0;
         g[2]=0;
@@ -658,10 +495,10 @@ void cICM20948::gyro_common(){
 			g[1] += gyroADC[1];             // Sum up 512 readings
 			g[2] += gyroADC[2];             // Sum up 512 readings
 
-      if(calibratingG >= 1600){
-        gyroZero[0] = g[0] / 800;
-        gyroZero[1] = g[1] / 800;
-        gyroZero[2] = g[2] / 800;
+      if(calibratingG >= MPU_CALI_COUNT_GYRO * 2){
+        gyroZero[0] = g[0] / MPU_CALI_COUNT_GYRO;
+        gyroZero[1] = g[1] / MPU_CALI_COUNT_GYRO;
+        gyroZero[2] = g[2] / MPU_CALI_COUNT_GYRO;
         //gyroZeroSum=gyroZero[0]+gyroZero[1]+gyroZero[2];
         calibratingG_f=1;
         calibratingG=0;
@@ -695,7 +532,6 @@ void cICM20948::acc_init( void ){
   accIMZero=0.0;
 }
 
-#if defined(USE_SPARK_LIB)
 void cICM20948::acc_get_adc( void ){
 	int16_t x = 0;
 	int16_t y = 0;
@@ -730,30 +566,6 @@ void cICM20948::acc_get_adc( void ){
 	acc_common();
 }
 
-#else
-void cICM20948::acc_get_adc( void ){
-	int16_t x = 0;
-	int16_t y = 0;
-	int16_t z = 0;
-  uint8_t rawADC[6];
-
-  if( bConnected == true ){    
-    _spi.spiRead(ICM20948_REG_ACCEL_XOUT_H_SH, &rawADC[0], 6);
-
-    x = (((int16_t)rawADC[0]) << 8) | rawADC[1];
-    y = (((int16_t)rawADC[2]) << 8) | rawADC[3];
-    z = (((int16_t)rawADC[4]) << 8) | rawADC[5];
-
-    accRAW[0] = x;
-    accRAW[1] = y;
-    accRAW[2] = z;
-    
-		ACC_ORIENTATION( x,	y, z );
-	}
-
-	acc_common();
-}
-#endif
 
 /*
 * get Average of Acc value
@@ -766,13 +578,13 @@ void cICM20948::acc_common(){
 
   if(calibratingA_f == 0){
     calibratingA++;
-    if(calibratingA >= 800){
+    if(calibratingA >= MPU_CALI_COUNT_ACC){
       // Z 軸のノイズを取り除く
       if(abs(accADC[2] - ACC_1G) > ACC_ZERO_Z_OVER){
         calibratingA--;
         return;
       }
-      if(calibratingA == 800){
+      if(calibratingA == MPU_CALI_COUNT_ACC){
         a[0]=0;
         a[1]=0;
         a[2]=0;
@@ -781,10 +593,10 @@ void cICM20948::acc_common(){
 			a[1] += accADC[1];             // Sum up 512 readings
 			a[2] += accADC[2];             // Sum up 512 readings
 
-      if(calibratingA >= 1600){
-        accZero[0] = a[0] / 800;
-        accZero[1] = a[1] / 800;
-        accZero[2] = a[2] / 800;
+      if(calibratingA >= MPU_CALI_COUNT_ACC*2){
+        accZero[0] = a[0] / MPU_CALI_COUNT_ACC;
+        accZero[1] = a[1] / MPU_CALI_COUNT_ACC;
+        accZero[2] = a[2] / MPU_CALI_COUNT_ACC;
         accZeroSum=accZero[0]+accZero[1]+accZero[2];
 
         // 此処で、acc の内積を出す。
@@ -802,17 +614,16 @@ void cICM20948::acc_common(){
 void cICM20948::mag_init( void )
 {
   uint8_t i;
-
   for( i=0; i<3; i++ )
   {
     magADC[i]   = 0;
 		magZero[i]  = 0;
     magRAW[i]   = 0;
   }
-  calibratingM = MPU_CALI_COUNT;
+  calibratingM_f = 0;
+  calibratingM = 0;
 }
 
-#if defined(USE_SPARK_LIB)
 /*---------------------------------------------------------------------------
      TITLE   : mag_get_adc
      WORK    :
@@ -876,76 +687,34 @@ bool cICM20948::mag_get_adc( void )
   return true;
 }
 
-#else
-/*---------------------------------------------------------------------------
-     TITLE   : mag_get_adc
-     WORK    :
-     ARG     : void
-     RET     : void
----------------------------------------------------------------------------*/
-bool cICM20948::mag_get_adc( void )
-{
-	// int16_t x = 0;
-	// int16_t y = 0;
-	// int16_t z = 0;
-
-  uint8_t data[8];
-
-  magADC[0]=magADC[1]=magADC[2]=0.0f;
-
-  if( bConnected == true )
-  {
-    //imu_spi_reads(MPU9250_ADDRESS, MPU9250_EXT_SENS_DATA_00, 8, data);
-    _spi.spiRead(ICM20948_REG_EXT_SLV_SENS_DATA_00, data,8);
-
-    if (!(data[0] & ICM20948_AK09916_DATA_READY) || (data[0] & ICM20948_AK09916_DATA_OVERRUN))
-    {
-      return false;
-    }
-    if (data[7] & ICM20948_AK09916_OVERFLOW)
-    {
-      return false;
-    }
-
-  	magRAW[0] = (data[2] << 8) | data[1];   // x-axis
-  	magRAW[1] = (data[4] << 8) | data[3];   // y-axis
-  	magRAW[2] = (data[6] << 8) | data[5];   // z-axis
-
-    //  AK8963_ASA[3] -> AK8963 キャリブレーションデータだが、AK09916 は、無し。
-  	//magRAW[0] = ((long)magRAW[0] * AK8963_ASA[0]) >> 8;
-  	//magRAW[1] = ((long)magRAW[1] * AK8963_ASA[1]) >> 8;
-  	//magRAW[2] = ((long)magRAW[2] * AK8963_ASA[2]) >> 8;
-
-  	mag_common();
-	}
-  else{
-    return false;
-  }
-
-  return true;
-}
-#endif
-
 void cICM20948::mag_common()
 {
+	//static int32_t m[3];
+	static long long m[3];
 
-	static int32_t m[3];
+  if(calibratingM_f == 0){
+    calibratingM++;
+    if(calibratingM >= MPU_CALI_COUNT_MAG){
 
-	if (calibratingM>0)
-	{
-		calibratingM--;
-		for (uint8_t axis = 0; axis < 3; axis++)
-		{
-			if (calibratingM ==(MPU_CALI_COUNT-1)) m[axis]=0;  // Reset a[axis] at start of calibration
-			m[axis] += magRAW[axis];             // Sum up 512 readings
-			magZero[axis] = m[axis]>>9;          // Calculate average, only the last itteration where (calibratingA == 0) is relevant
-		}
-		if (calibratingM == 0)
-		{
-			//accZero[YAW] -= ACC_1G;
-      //magZero[YAW] = 0;
-		}
-	}
+      if(calibratingM == MPU_CALI_COUNT_ACC){
+        m[0]=0;
+        m[1]=0;
+        m[2]=0;
+      }
+			m[0] += magRAW[0];   // Sum up 512 readings
+			m[1] += magRAW[1];   // Sum up 512 readings
+			m[2] += magRAW[2];   // Sum up 512 readings
+
+      if(calibratingM >= MPU_CALI_COUNT_MAG*2){
+        magZero[0] = m[0] / MPU_CALI_COUNT_MAG;          // Calculate average, only the last itteration where (calibratingA == 0) is relevant
+        magZero[1] = m[1] / MPU_CALI_COUNT_MAG;          // Calculate average, only the last itteration where (calibratingA == 0) is relevant
+        magZero[2] = m[2] / MPU_CALI_COUNT_MAG;          // Calculate average, only the last itteration where (calibratingA == 0) is relevant
+
+        calibratingM_f=1;
+        calibratingM=0;
+      }
+    }
+  }
 
   // Sensitivity Scale Factor = 0.15 add by nishi 2021.11.4
   magADC[0] =  (float)(magRAW[0] - magZero[0]) * MAG_UT_LSB ;
@@ -960,13 +729,16 @@ void cICM20948::dmp_init( void )
 {
   uint8_t i;
 
-  for( i=0; i<4; i++ )
+  for( i=1; i<4; i++ )
   {
     quat[i]   = 0.0;
-		quatZero[i]  = 0;
-    quatRAW[i]   = 0;
+		quatZero[i]  = 0.0;
+    quatRAW[i]   = 0.0;
   }
   quat[0]   = 1.0;
+  // add by nishi 2025.3.17
+  quatZero[0]  = 1.0;
+  quatRAW[0]   = 1.0;
 
   calibratingD_f = 0;
   calibratingD = 0;    // add by nishi 2022.1.23
@@ -1009,7 +781,7 @@ bool cICM20948::dmp_get_adc(){
   static byte f=0;
   static double q[4]={1.0, 0.0, 0.0, 0.0};
 
-  #define QUAT_CALIB
+  //#define QUAT_CALIB
 
   if ((myICM.status == ICM_20948_Stat_Ok) || (myICM.status == ICM_20948_Stat_FIFOMoreDataAvail)) // Was valid data available?
   {
@@ -1126,10 +898,12 @@ bool cICM20948::dmp_get_adc(){
 
               // キャリブレーションの終了回数に到達した。
               if(calibratingD >= 400){
-
                 // DMP の初期誤差を計算する。
-                quatZero[1] = d[1] / 200;
-                quatZero[2] = d[2] / 200;
+                // Z軸のみ補正します。by nishi 2025.3.17
+                //quatZero[1] = d[1] / 200;
+                quatZero[1] = 0.0;
+                //quatZero[2] = d[2] / 200;
+                quatZero[2] = 0.0;
                 quatZero[3] = d[3] / 200; 
 
                 calibratingD_f = 1;
@@ -1246,11 +1020,11 @@ bool cICM20948::dmp_get_adc(){
         double q1 = ((double)data.Quat6.Data.Q1) / 1073741824.0; // Convert to double. Divide by 2^30  -- X
         double q2 = ((double)data.Quat6.Data.Q2) / 1073741824.0; // Convert to double. Divide by 2^30  -- Y
         double q3 = ((double)data.Quat6.Data.Q3) / 1073741824.0; // Convert to double. Divide by 2^30  -- Z
-        //double q0 = sqrt(1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3)));    //  -- W    こいつが、バグとの事。
+        double q0 = sqrt(1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3)));    //  -- W    こいつが、バグとの事。
 
-        double q0=1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3));
-        if(q0 >= 0.0) q0 = sqrt(q0);
-        else q0 = sqrt(q0 * -1.0) * -1.0;
+        //double q0=1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3));
+        //if(q0 >= 0.0) q0 = sqrt(q0);
+        //else q0 = sqrt(q0 * -1.0) * -1.0;
 
         if(!isnan(q0)){
 
@@ -1259,6 +1033,7 @@ bool cICM20948::dmp_get_adc(){
           quatRAW[2] = q2;    // changed by nishi 2025.3.14
           quatRAW[3] = q3;    // changed by nishi 2025.3.14
 
+          // キャリブレーション中です。
           if(calibratingD_f == 0){
             calibratingD++;
             if(calibratingD >= 400){
@@ -1271,21 +1046,29 @@ bool cICM20948::dmp_get_adc(){
               d[2] += quatRAW[2];             // Sum up 512 readings
               d[3] += quatRAW[3];             // Sum up 512 readings
 
+              // キャリブレーションの終了回数に到達した。
               if(calibratingD >= 600){
-                quatZero[1] = d[1] / 200;
-                quatZero[2] = d[2] / 200;
+                // DMP の初期誤差を計算する。
+                // Z軸のみ補正します。by nishi 2025.3.17
+                //quatZero[1] = d[1] / 200;
+                quatZero[1] = 0.0;
+                //quatZero[2] = d[2] / 200;
+                quatZero[2] = 0.0;
                 quatZero[3] = d[3] / 200; 
 
                 calibratingD_f=1;
                 calibratingD = 0;
               }
             }
+            // キャリブレーションが終了した直後です。
             if (calibratingD_f == 1)
             {
               // DMP の誤差 quat の実数部を求める。
-              quatZero[0] =1.0 - ((quatZero[1] * quatZero[1]) + (quatZero[2] * quatZero[2]) + (quatZero[3] * quatZero[3]));
-              if(quatZero[0] >= 0.0) quatZero[0] = sqrt(quatZero[0]);
-              else quatZero[0] = sqrt(quatZero[0] * -1.0) * -1.0;
+              quatZero[0] = sqrt(1.0 - ((quatZero[1] * quatZero[1]) + (quatZero[2] * quatZero[2]) + (quatZero[3] * quatZero[3])));    //  -- W    こいつが、バグとの事。
+
+              //quatZero[0] =1.0 - ((quatZero[1] * quatZero[1]) + (quatZero[2] * quatZero[2]) + (quatZero[3] * quatZero[3]));
+              //if(quatZero[0] >= 0.0) quatZero[0] = sqrt(quatZero[0]);
+              //else quatZero[0] = sqrt(quatZero[0] * -1.0) * -1.0;
 
               // DMP 誤差 quat の補正(共役)  --> 誤差の分だけ、反対方向に回転させる。
               quatZeroK[1] = quatZero[1] * -1.0;
@@ -1357,3 +1140,8 @@ bool cICM20948::gyro_cali_get_done()
 	else                    return false;
 }
 
+bool cICM20948::mag_cali_get_done()
+{
+	if( calibratingM_f != 0 ) return true;
+	else                    return false;
+}

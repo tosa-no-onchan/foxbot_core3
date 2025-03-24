@@ -37,6 +37,10 @@
 // そうすると、SparkFun_LSM9DS1_Arduino_Library/src/SparkFunLSM9DS1.cpp がビルドされて、ライブラリーが作成されて、
 // コンパイルが出来ます。
 
+// add by nishi 2025.3.23
+// Teensy-ICM-20948 を使うときは、こちら。
+//#include "ICM20948_Teen.h"
+
 #if defined(USE_MADWICK)
   #include "MadgwickAHRS.h"
 #endif
@@ -64,13 +68,22 @@ public:
     cLSM9DS1 SEN;
   #elif defined(MPU6500_IMU)
   	cMPU6500 SEN;
+  // add by nishi 2025.3.23
+  #elif defined(Teensy_ICM)
+    cICM20948_Teen SEN;
   #endif
  
 	int16_t angle[3];
   float   rpy[3];
-  float   quat[4];
-  float   quat_tmp[4];
-  float   quat_tmp_prev[4];
+  //float   quat[4];
+  // changed by nishi 2025.3.17
+  double   quat[4];
+  //float   quat_tmp[4];
+  // changed by nishi 2025.3.17
+  double   quat_tmp[4];
+  //float   quat_tmp_prev[4];
+  // changed by nishi 2025.3.17
+  double   quat_tmp_prev[4];
   double  quat_dmp[4];  // add by nishi
   int16_t gyroData[3];
   int16_t gyroRaw[3];
