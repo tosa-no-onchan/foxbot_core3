@@ -30,7 +30,8 @@
 
  1. run
   $ sudo chmod 777 /dev/ttyUSB0 or /dev/ttyTHS1
-  $ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 [-v6] [-b 115200]
+  $ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 1000000 [-v6] 115200
+  $ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyS0 -b 1000000 [-v6]
 
  2. check
   $ ros2 topic list
@@ -38,7 +39,7 @@
 
 */
 
-#undef ESP32
+//#undef ESP32
 #include "foxbot_core3_r2_config.h"
 
 #include <sys/time.h>  // for struct timeval
@@ -59,7 +60,7 @@
 	#endif
 #endif
 
-#if defined(ESP32)
+#if defined(ESP32_WIFI)
 	#include <WiFi.h>
 	//const char SSID[] = "WiFi ID";
 	//const char PASSWORD[] = "WiFi passsword";
@@ -74,6 +75,8 @@
 
 // changed by nishi 2025.3.7
 #define ODOM_USE_IMU
+
+//#define MADG_DRIFT_CHECK
 
 // Multi task
 TaskHandle_t th[2];
@@ -236,7 +239,7 @@ void setup(){
 	#endif
 
 
-	#if defined(ESP32)
+	#if defined(ESP32_WIFI)
 		Serial.begin(115200);
 		delay(10);
 		Serial.println("start prog.");
@@ -322,10 +325,12 @@ void setup(){
 		Serial.print("\n");
 		delay(1000);        // delay mill sec 1000 [ms]
 
-		bool wait_f=true;
+		bool wait_f=false;
 		int waint_cnt = 5000;
 
 		#define TEST_QUAT_DISP
+
+		unsigned long update_us = 1000000UL/ sensors.cimu_.SEN.begin_update_rate;
 
 		while(1){
 			if(sen_init==true){
@@ -351,14 +356,15 @@ void setup(){
 						waint_cnt--;
 				}
 			}
-			#if defined(IMU_SENSER6)
-				delay(30);        // 
-			#else
-				//delay(30);        // delay mill sec [ms] 33 [hz] -> 
-				delay(29);        // delay mill sec [ms] 34.48 [hz] -> 
-				//delay(28);        // delay mill sec [ms] 38 [hz] -> 26 より、取れる。
-				//delay(26);        // delay mill sec [ms] 38 [hz] -> 途中で、取れなくなる。
-			#endif
+			//#if defined(IMU_SENSER6)
+			//	delay(30);        // 
+			//#else
+			//	//delay(30);        // delay mill sec [ms] 33 [hz] -> 
+			//	delay(29);        // delay mill sec [ms] 34.48 [hz] -> 
+			//	//delay(28);        // delay mill sec [ms] 38 [hz] -> 26 より、取れる。
+			//	//delay(26);        // delay mill sec [ms] 38 [hz] -> 途中で、取れなくなる。
+			//#endif
+			delayMicroseconds(update_us);  // micro sec
 		}
 	#endif
 
@@ -400,8 +406,10 @@ void setup(){
     #if defined(USE_TRACE)
       mySerial2.println("sensors.init(): Start!!");
 	#endif
+	sen_init=false;
 	if(sensors.init()==0x00){
-	  #if defined(USE_TRACE)
+		sen_init=true;
+		#if defined(USE_TRACE)
 		mySerial2.println("sensors.init(): OK");
 	  #endif
 	}
@@ -410,12 +418,11 @@ void setup(){
 		mySerial2.println("sensors.init(): NG");
 	  #endif
 	}
-	sen_init=true;
 
 	// Setting for SLAM and navigation (odometry, joint states, TF)
 	initOdom();
 	initJointStates();
-	prev_update_time = micros();
+	//prev_update_time = micros();
     setup_end = true;
 	//Serial.println("setup end");
 	delay(100);
@@ -492,8 +499,10 @@ void loop() {
 		set_my_time();	// NTP 時刻合わせ
 
 		// set_my_time() wait time
-		tTime[7] = foxbot3::micros_() + (5 * 60 * 1000000UL );	// 5[minute]
-		tTime[8] = foxbot3::micros_() + (1 * 1000000UL );	// 1[sec]  add by nishi 2023.2.26
+		//tTime[7] = foxbot3::micros_() + (5 * 60 * 1000000UL );	// 5[minute]
+		tTime[7] = micros();	// 5[minute]
+		//tTime[8] = foxbot3::micros_() + (1 * 1000000UL );	// 1[sec]  add by nishi 2023.2.26
+		tTime[8] = micros();	// 1[sec]  add by nishi 2023.2.26
 
 		// 初期化は、1回のみにします。 by nishi 2023.2.28
 		if(init_cnt==0){
@@ -515,9 +524,11 @@ void loop() {
 		}
 		if (state == AGENT_CONNECTED) {
 			#if defined(USE_PC_BEAT)
-				foxbot3::usec_t t0 = foxbot3::micros_();
+				//foxbot3::usec_t t0 = foxbot3::micros_();
+				unsigned long t0 = micros();
 				// check pc_beat 
-				if(use_beat == true && t0 >= tTime[8]){
+				// 1[sec]
+				if(use_beat == true && (t0 - tTime[8]) >= (1 * 1000000UL)){
 					// beat lost
 					if(beat_no == beat_no_prev){
 						// stop moter drive
@@ -542,7 +553,8 @@ void loop() {
 					beat_no_prev = beat_no;
 					beat_ok_prev = beat_ok;
 
-					tTime[8] = t0 + (1* 1000000UL );	// 1[sec]
+					//tTime[8] = t0 + (1* 1000000UL );	// 1[sec]
+					tTime[8] = t0;	// 1[sec]
 				}
 			#endif
 			// 従来の loop() 処理
@@ -552,11 +564,15 @@ void loop() {
 			//RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(20)));
 
 			// syscronize NTP
-			foxbot3::usec_t t = foxbot3::micros_();
+			//foxbot3::usec_t t = foxbot3::micros_();
+			unsigned long t = micros();
 			// set_my_time() wait time over
-			if(t >= tTime[7]){
+			//if(t >= tTime[7]){
+			// 5[minute]
+			if((t - tTime[7]) >= (5 * 60 * 1000000UL )){
 				set_my_time(50);
-				tTime[7] = t + (5 * 60 * 1000000UL );	// 5[minute]
+				//tTime[7] = t + (5 * 60 * 1000000UL );	// 5[minute]
+				tTime[7] = t;
 			}
 		}
 	  }
@@ -651,11 +667,13 @@ void loop_main(){
 	//sensors.updateIMU();
 
 	//uint32_t t = millis();
-	//unsigned long t = micros();
-	foxbot3::usec_t t = foxbot3::micros_();
+	unsigned long t = micros();
+	//foxbot3::usec_t t = foxbot3::micros_();
 
 	// update odometry
-	if (t >= tTime[2]){
+	//if (t >= tTime[2]){
+	if ((t - tTime[2]) >= frequency_odometry_hz){
+		tTime[2]=t;
 		//float dt, dx, dy, dz;
 		double dt, dx, dy, dz;
 		//float qw, qx, qy, qz;
@@ -708,12 +726,17 @@ void loop_main(){
 				q[3] = imu_msg.orientation.z;
 
 				// DEBUG
-				double roll,pitch,yaw;
-				foxbot3::QuaternionToEulerAngles(q,roll,pitch,yaw);
-				debug_right.x = roll;
-				debug_right.y = pitch;
-				debug_right.z = yaw;
-				//debug_right.z = pwmMotorRight;
+				// DMP のデータ切断のチェックをする。
+				//#define DEBUG_CHK_DMP_SIGNAL
+				//#if defined(DEBUG_CHK_DMP_SIGNAL)
+				#if !defined(MADG_DRIFT_CHECK)
+					double roll,pitch,yaw;
+					foxbot3::QuaternionToEulerAngles(q,roll,pitch,yaw);
+					debug_right.x = roll;
+					debug_right.y = pitch;
+					debug_right.z = yaw;
+					//debug_right.z = pwmMotorRight;
+				#endif
 
 			}
 
@@ -878,9 +901,10 @@ void loop_main(){
 		//Serial.print(motor_tic.right, DEC);
 		//Serial.println("");
 
-		tTime[2] = t + frequency_odometry_hz;	// set 1-cycle-time [ms] to odom Timer.
+		//tTime[2] = t + frequency_odometry_hz;	// set 1-cycle-time [ms] to odom Timer.
 
-		t = foxbot3::micros_();
+		//t = foxbot3::micros_();
+		t = micros();
     }
 
 	// Update the IMU unit.	add by nishi 2021.7.5
@@ -891,7 +915,9 @@ void loop_main(){
 
 	// IMU Publish.	add by nishi 2021.7.5
 	//if(_frequency_imu.delay(millis())) {
-	if (t >= tTime[3]){
+	if ((t - tTime[3])>=(1000000UL / FREQUENCY_IMU_PUBLISH_HZ)){
+	    //tTime[3] = t + (1000000UL / FREQUENCY_IMU_PUBLISH_HZ);
+	    tTime[3] = t;
 		if(use_imu_pub==true){
 	    	publishImuMsg();
 		}
@@ -904,8 +930,8 @@ void loop_main(){
 			RCSOFTCHECK_PROC("loop_main() :#4 debug_right_publish",rcl_publish(&debug_right_publisher, &debug_right, NULL));
 		#endif
 
-	    tTime[3] = t + (1000000UL / FREQUENCY_IMU_PUBLISH_HZ);
 		//t = millis();		// comment in by nishi 2022.3.18
+		t = micros();
 	}
 
 	//if(_frequency_ver_info.delay(millis())) {
@@ -913,14 +939,15 @@ void loop_main(){
 	//}
 
 	// update subscribers values
-	if (t >= tTime[5]){
+	// wait 20[ms]
+	if ((t - tTime[5])>=(1000000UL / FREQUENCY_ROSPINONCE_HZ)){
 		// Subscribe topic の 受信時に必要
 		//RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
 		//RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(2)));
 		RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(2)));	// update by nishi 2023.1.19
 
 	    //tTime[5] = t + 2000;	// wait 2[ms]
-	    tTime[5] = t + (1000000UL / FREQUENCY_ROSPINONCE_HZ);	// wait 20[ms]
+	    tTime[5] = t;	// wait 20[ms]
 	}
 
 }
@@ -931,9 +958,7 @@ void commandVelocityCallback(const void *cmd_vel_msg){
 	const geometry_msgs__msg__Twist * msg = (const geometry_msgs__msg__Twist *)cmd_vel_msg;
 	// if velocity in x direction is 0 turn off LED, if 1 turn on LED
 	//digitalWrite(LED_PIN, (msg->linear.x == 0) ? LOW : HIGH);
-	//if(state == AGENT_CONNECTED && beat_ok==true){
-	// changed by nishi 2025.3.20
-	if(state == AGENT_CONNECTED && beat_ok==true && debug_left.data >= IMU_DATA_RATE_THRES){
+	if(state == AGENT_CONNECTED && beat_ok==true){
 		linear_velocity_ref  = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->linear.x;
 		angular_velocity_ref = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->angular.z;
 	}
@@ -1174,13 +1199,21 @@ void update_motor(void *pvParameters){
 	int ac_cnt3=0;
 	clock_t t_start2 ,t_end2;
 
+	// add by nishi 2025.3.26
+	double roll,pitch,yaw;
+	double roll_prev,pitch_prev,yaw_prev;
+	roll = pitch = yaw=0.0;
+	roll_prev = pitch_prev = yaw_prev = 0.0;
+
+	unsigned long update_us = 1000000UL/ sensors.cimu_.SEN.begin_update_rate;
+
 	while(1){
 		//uint32_t t = millis();
-		//unsigned long t = micros();
-		foxbot3::usec_t t = foxbot3::micros_();	// update by nishi 2022.10.28
+		unsigned long t = micros();
 
 		// rate computation
-		if (t >= tTime[0]){
+		if ((t - tTime[0]) >= (1000000UL / FREQUENCY_RATE_HZ)){
+			tTime[0] = t;
 			//digitalWrite(RT_PIN0, HIGH);
 			//float dt;
 			double dt;
@@ -1239,12 +1272,13 @@ void update_motor(void *pvParameters){
 									/ (WHEEL_RADIUS);
 			//digitalWrite(RT_PIN0, LOW);
 
-			tTime[0] = t + (1000000UL / FREQUENCY_RATE_HZ);
-			t = foxbot3::micros_();
+			//t = foxbot3::micros_();
+			t = micros();
 		}
 
 		// rate controler
-		if (t >= tTime[1]){
+		if ((t - tTime[1])>=(1000000UL / FREQUENCY_CONTROLLER_HZ)){
+			tTime[1] = t;
 			//digitalWrite(RT_PIN1, HIGH);
 
 			// MOTOR RIGHT
@@ -1280,8 +1314,8 @@ void update_motor(void *pvParameters){
 			//debug_publisher2.publish(&debug_right);
 			//digitalWrite(RT_PIN1, LOW);
 
-			tTime[1] = t + (1000000UL / FREQUENCY_CONTROLLER_HZ);
-			t = foxbot3::micros_();		// add by nishi 2022.3.18
+			//t = foxbot3::micros_();		// add by nishi 2022.3.18
+			t = micros();		// add by nishi 2022.3.18
 		}
 
 		//if (t >= tTime[4]){
@@ -1297,7 +1331,9 @@ void update_motor(void *pvParameters){
 		//	tTime[4] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);
 		//}
 
-	    if (t >= tTime[6]){
+	    if ((t - tTime[6]) >= update_us){
+			// add by nishi 2025.4.11
+			tTime[6] = t;
 			//Serial.println("start update_imu()");
 			if(sen_init==true){
 				// IMU device へのデータアクセスを行う。
@@ -1310,25 +1346,48 @@ void update_motor(void *pvParameters){
 					portEXIT_CRITICAL(&mutex);
 				}
 			}
-			#if defined(IMU_SENSER6)
-				//                                    無負荷時  /  Madgwick時 / DMP6時  / DMP6 + Acc
-				//tTime[6] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);	// 実測 99[Hz]	有効実測 55[Hz] changed by nishi 2025.1.26
-				tTime[6] = t + (1000000UL / 55);	// 実測 99[Hz]	有効実測 51[Hz] changed by nishi 2025.3.21
-				//tTime[6] = t + 1000000UL / 100;   //    
-				//tTime[6] = t + 1000000UL / 250;   //    
-				//tTime[6] = t + 1000000UL / 400;   //        /  206        /   205     /
-				//tTime[6] = t + 1000000UL / 450;   //        /  216        /        /
-				//tTime[6] = t + 1000000UL / 600;   //    
-				//tTime[6] = t + 1000000UL / 700;   //        /  263        /   300     /  2025.1.22 迄の設定
-				//tTime[6] = t + 1000000UL / 950;   //        /  292        /        /
-				//tTime[6] = t + 1000000UL / 1000;  //        /  300        /   338   /  338 だけど tf が変
-				// 無制限 							 //        / 1544 - 1620 / 3700   / 1600 だけど tf が変
-			#else
-				//tTime[6] = t + 1000000UL / 63;   //  実測 -> 62[hz]
-				//tTime[6] = t + 1000000UL / 55;   //  実測 -> 54[hz]こちらにしてみる。 有効、実測 28[Hz] by nishi 2025.1.24
-				tTime[6] = t + 1000000UL / 30;   //  こちらにしてみる。 有効、実測 28[Hz] by nishi 2025.3.12
-				//tTime[6] = t + 1000000UL / 38;   // 38[Hz]  2025.1.19 以前の設定。
-			#endif
+			//#if defined(USE_DMP_NISHI)
+			//	#if defined(IMU_SENSER6)
+			//		//                                    無負荷時  /  Madgwick時 / DMP6時  / DMP6 + Acc
+			//		//tTime[6] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);	// 実測 57[Hz]	changed by nishi 2025.1.26
+			//		tTime[6] = t + (1000000UL / 55);	// 実測 51[Hz]	changed by nishi 2025.1.26
+			//		//tTime[6] = t + 1000000UL / 100;   //    
+			//		//tTime[6] = t + 1000000UL / 250;   //    
+			//		//tTime[6] = t + 1000000UL / 400;   //        /  206        /   205     /
+			//		//tTime[6] = t + 1000000UL / 450;   //        /  216        /        /
+			//		//tTime[6] = t + 1000000UL / 600;   //    
+			//		//tTime[6] = t + 1000000UL / 700;   //        /  263        /   300     /   2025.1.25 迄の設定値
+			//		//tTime[6] = t + 1000000UL / 950;   //        /  292        /        /
+			//		//tTime[6] = t + 1000000UL / 1000;  //        /  300        /   338   /  338 だけど tf が変
+			//		// 無制限 							 //        / 1544 - 1620 / 3700   / 1600 だけど tf が変
+			//	#else
+			//		//tTime[6] = t + 1000000UL / 60;   //  実測 60[Hz] by nishi 2025.1.25 
+			//		//tTime[6] = t + 1000000UL / 55;   // 実測 55[hz] by nishi 2025.1.15
+			//		tTime[6] = t + 1000000UL / 30;   //    40[Hz]  2025.1.15 迄の設置値
+			//		//tTime[6] = t + 1000000UL / 38;   //    38[Hz]
+			//		//tTime[6] = t + 1000000UL / 27;	  	// 27[Hz]  2025.1.24
+			//	#endif
+			//#else
+			//	#if defined(IMU_SENSER6)
+			//		//                                    無負荷時  /  Madgwick時 / DMP6時  / DMP6 + Acc
+			//		//tTime[6] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);	// 実測 57[Hz]	changed by nishi 2025.1.26
+			//		//tTime[6] = t + 1000000UL / 100;   // 実測 100 - 99[Hz]   
+			//		tTime[6] = t + 1000000UL / 250;   //  実測 249[Hz]  
+			//		//tTime[6] = t + 1000000UL / 400;   //        /  206        /   205     /
+			//		//tTime[6] = t + 1000000UL / 450;   //        /  216        /        /
+			//		//tTime[6] = t + 1000000UL / 600;   //    
+			//		//tTime[6] = t + 1000000UL / 700;   //        /  263        /   300     /   2025.1.25 迄の設定値
+			//		//tTime[6] = t + 1000000UL / 950;   //        /  292        /        /
+			//		//tTime[6] = t + 1000000UL / 1000;  //        /  300        /   338   /  338 だけど tf が変
+			//		// 無制限 							 //        / 1544 - 1620 / 3700   / 1600 だけど tf が変
+			//	#else
+			//		//tTime[6] = t + 1000000UL / 60;   //  実測 60[Hz] by nishi 2025.1.25 
+			//		tTime[6] = t + 1000000UL / 55;   // 実測 55[hz] by nishi 2025.1.15
+			//		//tTime[6] = t + 1000000UL / 30;   //    40[Hz]  2025.1.15 迄の設置値
+			//		//tTime[6] = t + 1000000UL / 38;   //    38[Hz]
+			//		//tTime[6] = t + 1000000UL / 27;	  	// 27[Hz]  2025.1.24
+			//	#endif
+			//#endif
 			// changed by nishi 2025.3.7
 			//ac_cnt2++;
 		}
@@ -1347,7 +1406,9 @@ void update_motor(void *pvParameters){
 		#endif
 
 		// DMP のデータ監視を行う!!
-		if (t >= tTime[9]){
+		// 4[sec]
+		if ((t - tTime[9] >= 1000000UL * 4)){
+			tTime[9] = t;
 			//SERIAL_PORT.print(F("acc_hz:"));
 			//SERIAL_PORT.println(hz, 4);
 			float hz = (float)ac_cnt2/4;
@@ -1358,27 +1419,39 @@ void update_motor(void *pvParameters){
 			//debug_right.data = (int32_t)hz3;
 
 			// add by nishi 2025.3.20
-			if(debug_left.data >= IMU_DATA_RATE_THRES){
-				#if defined(BOARD_ESP32)
-					//pinMode(LED_PIN, OUTPUT);
-					digitalWrite(LED_PIN, LOW);  // light OFF
-				#endif
-			}
-			else{
-				// stop moter drive
-				linear_velocity_ref=0.0;
-				angular_velocity_ref=0.0;
-				#if defined(BOARD_ESP32)
-					//pinMode(LED_PIN, OUTPUT);
-					digitalWrite(LED_PIN, HIGH);  // light ON
-				#endif
+			if (state == AGENT_CONNECTED){
+				if(debug_left.data >= IMU_DATA_RATE_THRES){
+					#if defined(BOARD_ESP32)
+						digitalWrite(LED_PIN, LOW);  // light OFF
+					#endif
+				}
+				else{
+					// stop moter drive
+					//linear_velocity_ref=0.0;
+					//angular_velocity_ref=0.0;
+					#if defined(BOARD_ESP32)
+						digitalWrite(LED_PIN, HIGH);  // light ON
+					#endif
+				}
 			}
 			ac_cnt2=0;
 			ac_cnt3=0;
-			
-			tTime[9] = t + 1000000UL * 4;   // 4[sec]
-		}
 
+			// Madgwick のドリフト量をチェック。
+			// IMU を静止した状態でチェックします。
+			// 下記コマンドで確認できる。
+			// $ ros2 topic echo /debug_right
+			#if defined(MADG_DRIFT_CHECK)
+				foxbot3::QuaternionToEulerAngles(sensors.cimu_.quat,roll,pitch,yaw);
+				debug_right.x = (roll-roll_prev)/4.0;		// x: 0.00017295989874542908 + 0.00014397176419547741
+				debug_right.y = (pitch-pitch_prev)/4.0;		// y: 3.0994553855923264e-05
+				debug_right.z = (yaw - yaw_prev)/4.0;		// z: -0.0009625205553624571 + 0.0005888283291343348
+
+				roll_prev=roll;
+				pitch_prev = pitch;
+				yaw_prev=yaw;
+			#endif
+		}
 		//delay(1);
 		//vTaskDelay(1);
 	}
@@ -1599,15 +1672,18 @@ void updateVariable(bool isConnected)
   if (isConnected)
   {
     if (variable_flag == false)
-    {      
-	  sen_init=false;
+    {   
+	  // changed by nishi  2025.4.2 
+	  //sen_init=false;
 
 	  #if defined(USE_TRACE)
     	mySerial2.println("sensors.initIMU(): Start!!");
 	  #endif
 
-	  for(int i=0;i<4;i++){
-      	if (0==sensors.initIMU()){
+	  //for(int i=0;i<4;i++){
+	  // changed by nishi 2025.4.2
+	  for(int i=0;sen_init==false && i<4;i++){
+		if (0==sensors.initIMU()){
 	      sen_init=true;
           break;
 		}

@@ -210,8 +210,9 @@ MedianFilter motor_left_direction_median_filter(RATE_DIRECTION_MEDIAN_FILTER_SIZ
 #define RIGHT                            1
 
 // add by nishi 2025.3.20
-#define IMU_DATA_RATE_THRES    26       // 28[Hz]
+//#define IMU_DATA_RATE_THRES    26       // 28[Hz]
 //#define IMU_DATA_RATE_THRES    16       // 18[Hz]
+#define IMU_DATA_RATE_THRES    1       // 1[Hz]
 // add by nishi end
 
 
@@ -489,16 +490,14 @@ type sign(type value) {
 /*******************************************************************************
 * Declaration for SLAM and navigation
 *******************************************************************************/
-unsigned long prev_update_time;
+//unsigned long prev_update_time;
 float odom_pose[3];
 double odom_vel[3];
 
 /*******************************************************************************
 * SoftwareTimer of Turtlebot3
 *******************************************************************************/
-//static uint32_t tTime[10]={0,0,0,0,0,0,0,0,0,0};
-//static unsigned long tTime[10]={0,0,0,0,0,0,0,0,0,0};
-static foxbot3::usec_t tTime[10]={0,0,0,0,0,0,0,0,0,0};        //changed by nishi 2022.10.28
+static uint32_t tTime[10]={0,0,0,0,0,0,0,0,0,0};
 // [7] : set_my_time() wait time
 
 //uint32_t frequency_odometry_hz;     // FREQUENCY_ODOMETRY_HZ
