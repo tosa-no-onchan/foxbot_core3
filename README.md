@@ -189,6 +189,11 @@ portEXIT_CRITICAL(&mutex);
 
       1) ICM-20948 DMP6 and DMP9 を止めて、ACC、Gyro、 Magnet + MadgwickAHRS を使うことにした。  
     
+2025.5.25  
+
+      1) ICM-20948 ACC、Gyro + MadgwickAHRS 6軸 Fusion を使うことにした。  
+    
+
 
 これに関する記事。  
 [ROS2 自作 Turtlebot3 による 草刈りロボット開発。#11 ロボットの走行方向がずれる。](https://www.netosa.com/blog/2025/03/ros2-turtlebot3-11.html)  
