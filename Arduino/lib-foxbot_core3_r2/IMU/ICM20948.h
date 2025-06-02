@@ -35,8 +35,9 @@
 	//#define USE_DUAL_RATE
 
 	//#define USE_DMP_NISHI
+
+	//#define USE_DUAL_FILTERS
 	#define USE_MADWICK
-	//#define USE_MADWICK_2
 	//#define USE_MAHONY
 
 	// add by nishi 2021.10.7
@@ -52,9 +53,9 @@
 
 	#define USE_SCALE_DATA
 
-	//#define USE_IMU_NO1
+	#define USE_IMU_NO1
 	//#define USE_IMU_NO2
-	#define USE_IMU_NO3
+	//#define USE_IMU_NO3
 
 // for micro_ros_tf_publisher
 #else
@@ -68,8 +69,8 @@
 	//#define USE_DMP_NISHI
 	//#define USE_AGM_NISHI		// DMP INV_ICM20948_SENSOR_GEOMAGNETIC_FIELD           (32-bit calibrated compass)
 
+	//#define USE_DUAL_FILTERS
 	#define USE_MADWICK
-	//#define USE_MADWICK_2
 	//#define USE_MAHONY
 
 	// add by nishi 2021.10.7
@@ -86,8 +87,8 @@
 	#define USE_SCALE_DATA
 
 	//#define USE_IMU_NO1
-	//#define USE_IMU_NO2
-	#define USE_IMU_NO3
+	#define USE_IMU_NO2
+	//#define USE_IMU_NO3
 
 #endif
 
@@ -121,16 +122,20 @@
 
 #if defined(IMU_SENSER6)
 	#define MADWICK_beta 0.1f
-	#define MAHONY_twoKi 1.0f
-	//#define MAHONY_twoKi 5.0f		// こちらが、良いみたい
-	//#define MAHONY_twoKi 4.0f
+	#if defined(USE_DUAL_FILTERS)
+		#define MAHONY_twoKi 5.0f		// こちらが、良いみたい
+	#else
+		#define MAHONY_twoKi 1.0f
+		//#define MAHONY_twoKi 5.0f		// こちらが、良いみたい
+		//#define MAHONY_twoKi 4.0f
+	#endif
 #else
 	//#define MADWICK_beta 1.0f		// 落ち着くのに時間がかかる。
 	#define MADWICK_beta 2.0f
 	//#define MAHONY_twoKi 2.0f			// 落ち着くのに時間がかかる。
-	#define MAHONY_twoKi 3.0f			//
+	//#define MAHONY_twoKi 3.0f			//
 	//#define MAHONY_twoKi 5.0f
-	//#define MAHONY_twoKi 10.0f
+	#define MAHONY_twoKi 10.0f
 	//#define MAHONY_twoKi 20.0f		// 収束しない。
 #endif
 
@@ -161,21 +166,31 @@
   //  GYRO_FS_SEL=2 32.8 LSB/(dps) 1
   //  GYRO_FS_SEL=3 16.4 LSB/(dps) 1
   //
-  // Magnet
-  // 1.Full-Scale Range ±4900 μT 1
-  // 2.Output Resolution 16 bits 1
-  // 3.Sensitivity Scale Factor 0.15 μT / LSB 1
 
 
 #if defined(USE_IMU_NO1)
-	#define GYRO_NOISE_CUT_OFF 4
+	#if defined(USE_GYRO_500)
+		//#define GYRO_NOISE_CUT_OFF 8
+		#define GYRO_NOISE_CUT_OFF 10.0
+	#elif defined(USE_GYRO_2000)
+		#define GYRO_NOISE_CUT_OFF 1.7
+		//#define GYRO_NOISE_CUT_OFF 2.0
+	#endif
 #elif defined(USE_IMU_NO2)
-	#define GYRO_NOISE_CUT_OFF 4
+	#if defined(USE_GYRO_500)
+		#define GYRO_NOISE_CUT_OFF 10.0
+	#elif defined(USE_GYRO_2000)
+		#define GYRO_NOISE_CUT_OFF 1.7
+		//#define GYRO_NOISE_CUT_OFF 2.0
+	#endif
 #else
-	#define GYRO_NOISE_CUT_OFF 10
-	//#define GYRO_NOISE_CUT_OFF 8
+	#if defined(USE_GYRO_500)
+		#define GYRO_NOISE_CUT_OFF 10.0
+	#elif defined(USE_GYRO_2000)
+		#define GYRO_NOISE_CUT_OFF 1.7
+		//#define GYRO_NOISE_CUT_OFF 2.0
+	#endif
 #endif
-
 
 #if defined(USE_ACC_2G)
 	// 2[G]
@@ -315,7 +330,8 @@ public:
 	int16_t  gyroADC[3];
 	float  gyroADC_BD[3];	// add by nishi from ICM-20948
 	int16_t  gyroRAW[3];
-	int16_t  gyroZero[3];
+	//int16_t  gyroZero[3];
+	float  gyroZero[3];
 
 	int16_t  accADC[3];
 	float    accADC_BD[3];	// scale data add by nishi from ICM-20948
@@ -393,11 +409,8 @@ public:
 	//float mag_offsets[3]            = { 19.03 , 4.63 , 42.23 };	// MotionCal
 	//float mag_offsets[3]            = { 28.67 , -3.63 , 3.34 };	// MotionCali #4 4.7% 2番 10[Hz]
 	//float mag_offsets[3]            = { -12.43 , -18.14 , -4.86 };	// MotionCali #5 18.2%     3番 10[Hz]
-	//float mag_offsets[3]            = { -18.99 , 8.85 , -1.85 };	// MotionCali #6 22.3%     3番 10[Hz]
-	//float mag_offsets[3]            = { 17.76 , 21.86 , 9.71 };	// MotionCali #7 4.5%     2番 10[Hz]
-	//float mag_offsets[3]            = { 19.45 , 21.17 , 11.59 };	// MotionCali #8 7.5%     2番 10[Hz]
-	//float mag_offsets[3]            = { 18.61 , 21.04 , 9.73 };	// MotionCali #9 4.0%     2番 10[Hz]
-	float mag_offsets[3]            = { 19.09 , 22.81 , 9.93 };	// MotionCali #10 2.8%     2番 100[Hz]
+	//float mag_offsets[3]            = { 14.61 , 26.32 , 13.26 };	// MotionCali #7 44.1%     2番 10[Hz]
+	float mag_offsets[3]            = { 17.68 , 19.53 , 6.11 };	// MotionCali #8 0.2%     2番 10[Hz]
 
 	//float mag_offsets[3]            = { 189.57, 235.35, 121.61 };	// calibrate3.py
 
@@ -418,30 +431,18 @@ public:
 	//											{ 0.040 , 1.002 , 0.048 },
 	//											{ 0.036 , 0.048 , 0.780 }};
 
-	//float mag_softiron_matrix[3][3] = {							// MotionCal #6 22.3%
-	//											{ 1.071 , -0.076 , 0.036 },
-	//											{ -0.076 , 1.020 , -0.049 },
-	//											{ 0.036 , -0.049 , 0.924 }};
 												
-	//float mag_softiron_matrix[3][3] = {							// MotionCal #7 4.5%
-	//											{ 1.059 , -0.055 , 0.006 },
-	//											{ -0.055 , 1.024 , -0.051 },
-	//											{ 0.006 , -0.051 , 0.928 }};
+	//float mag_softiron_matrix[3][3] = {							// MotionCal #7 44.1%
+	//											{ 1.029 , 0.0 , 0.00 },
+	//											{ 0.000 , 1.020 , 0.000 },
+	//											{ 0.000 , 0.000 , 0.953 }};
 
-	//float mag_softiron_matrix[3][3] = {							// MotionCal #8 7.5%
-	//											{ 1.084 , -0.017 , -0.006 },
-	//											{ -0.017 , 1.002 , -0.070 },
-	//											{ -0.006 , -0.070 , 0.926 }};
+	float mag_softiron_matrix[3][3] = {							// MotionCal #8 0.4%
+												{ 1.080 , -0.006 , -0.010 },
+												{ -0.006 , 0.984 , -0.085 },
+												{ -0.010 , -0.085 , 0.949 }};
 	
-	//float mag_softiron_matrix[3][3] = {							// MotionCal #9 4.0%
-	//											{ 1.054 , 0.030 , 0.023 },
-	//											{ 0.030 , 0.937 , -0.053 },
-	//											{ 0.023 , -0.053 , 1.017 }};
 
-	float mag_softiron_matrix[3][3] = {							// MotionCal #10 2.8%
-												{ 1.050 , 0.004 , -0.008 },
-												{ 0.004 , 0.974 , -0.057 },
-												{ -0.008 , -0.057 , 0.981 }};
 
 
 	//float mag_softiron_matrix[3][3] = {							// calibrate3.py

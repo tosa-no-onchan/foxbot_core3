@@ -91,6 +91,7 @@ cICM20948::cICM20948()
       //begin_update_rate = 100;
     #else
       begin_update_rate = 100;
+      //begin_update_rate = 10;
     #endif
     mag_update_rate = 100;
     //mag_update_rate = 10;
@@ -607,9 +608,9 @@ void cICM20948::gyro_get_adc( void ){
 
   if( bConnected == true ){
     // scale data Gyr (DPS)
-    gyroADC_BD[0] = myICM.gyrX();
-    gyroADC_BD[1] = myICM.gyrY();
-    gyroADC_BD[2] = myICM.gyrZ();
+    //gyroADC_BD[0] = myICM.gyrX();
+    //gyroADC_BD[1] = myICM.gyrY();
+    //gyroADC_BD[2] = myICM.gyrZ();
 
     //#define USE_GYRO_DEBUG_X1
     #if defined(USE_GYRO_DEBUG_X1)
@@ -620,7 +621,6 @@ void cICM20948::gyro_get_adc( void ){
       SERIAL_PORT.print(F(" ,"));
       SERIAL_PORT.println(gyroADC_BD[2], 3);
     #endif
-
 
     // raw data
   	gyroRAW[0] = x = myICM.agmt.gyr.axes.x;
@@ -634,14 +634,14 @@ void cICM20948::gyro_get_adc( void ){
       //xf = (float)x * gRes;
       //yf = (float)y * gRes;
       //zf = (float)z * gRes;
-      SERIAL_PORT.print(F("gyroRAW:"));
-      //SERIAL_PORT.print(F(","));
+      //SERIAL_PORT.print(F("gyroRAW:"));
+      SERIAL_PORT.print(F(","));
       SERIAL_PORT.print(x);
       SERIAL_PORT.print(F(","));
       SERIAL_PORT.print(y);
       SERIAL_PORT.print(F(","));
       SERIAL_PORT.print(z);
-      SERIAL_PORT.println("");
+      //SERIAL_PORT.println("");
     #endif
 
   	GYRO_ORIENTATION( x, y,z );
@@ -675,9 +675,9 @@ void cICM20948::gyro_common(){
 			g[2] += gyroADC[2];             // Sum up 512 readings
 
       if(calibratingG >= (MPU_CALI_COUNT_GYRO_PRE+MPU_CALI_COUNT_GYRO)-1){
-        gyroZero[0] = g[0] / MPU_CALI_COUNT_GYRO;
-        gyroZero[1] = g[1] / MPU_CALI_COUNT_GYRO;
-        gyroZero[2] = g[2] / MPU_CALI_COUNT_GYRO;
+        gyroZero[0] = (float)g[0] / MPU_CALI_COUNT_GYRO;
+        gyroZero[1] = (float)g[1] / MPU_CALI_COUNT_GYRO;
+        gyroZero[2] = (float)g[2] / MPU_CALI_COUNT_GYRO;
 
         //#define USE_GYRO_DEBUG_X3
         #if defined(USE_GYRO_DEBUG_X3)
@@ -705,18 +705,18 @@ void cICM20948::gyro_common(){
   }
   if(calibratingG_f != 0){
     // これがないと、ドリフトが大きいみたい。
-    gyroADC[0] -= gyroZero[0];
-    gyroADC[1] -= gyroZero[1];
-    gyroADC[2] -= gyroZero[2];
+    gyroADC_BD[0] = (float)gyroADC[0] - gyroZero[0];
+    gyroADC_BD[1] = (float)gyroADC[1] - gyroZero[1];
+    gyroADC_BD[2] = (float)gyroADC[2] - gyroZero[2];
 
     //#define USE_GYRO_DEBUG_X4
     #if defined(USE_GYRO_DEBUG_X4)
-      SERIAL_PORT.print(F("gyroADC:"));
-      //SERIAL_PORT.print(gyroADC[0]);
+      SERIAL_PORT.print(F("gyroADC_BD:"));
+      //SERIAL_PORT.print(gyroADC_BD[0]);
       //SERIAL_PORT.print(F(" ,"));
-      //SERIAL_PORT.print(gyroADC[1]);
+      //SERIAL_PORT.print(gyroADC_BD[1]);
       //SERIAL_PORT.print(F(" ,"));
-      SERIAL_PORT.print(gyroADC[2]);
+      SERIAL_PORT.print(gyroADC_BD[2]);
       SERIAL_PORT.println("");
     #endif
 
@@ -724,26 +724,29 @@ void cICM20948::gyro_common(){
     // MadgwickAHRS.cpp and FusionAhrs.c では、gyro値 = 0.0 だとアクセスエラーと
     // 判定するみたいだ。 by nishi 2022.5.12
     // ノイズを削ってみる。
-    //for (int axis = 0; axis < 3; axis++){
-    //  if (abs(gyroADC[axis]) <= GYRO_NOISE_CUT_OFF){
-    //    gyroADC[axis] = 0;
-    //  }
-    //}
-    if (abs(gyroADC[2]) <= GYRO_NOISE_CUT_OFF){
-      gyroADC[2] = 0;
-      //gyroADC[2] /= 4;
+    for (int axis = 0; axis < 3; axis++){
+      if (abs(gyroADC_BD[axis]) <= GYRO_NOISE_CUT_OFF){
+        gyroADC_BD[axis] = 0;
+      }
     }
+    //if (abs(gyroADC_BD[2]) <= GYRO_NOISE_CUT_OFF){
+    //  gyroADC_BD[2] = 0;
+    //}
 
     //#define USE_GYRO_DEBUG_X5
     #if defined(USE_GYRO_DEBUG_X5)
-      SERIAL_PORT.print(F("gyroADC:"));
-      //SERIAL_PORT.print(gyroADC[0]);
+      SERIAL_PORT.print(F("gyroADC_BD:"));
+      //SERIAL_PORT.print(gyroADC_BD[0]);
       //SERIAL_PORT.print(F(" ,"));
-      //SERIAL_PORT.print(gyroADC[1]);
+      //SERIAL_PORT.print(gyroADC_BD[1]);
       //SERIAL_PORT.print(F(" ,"));
-      SERIAL_PORT.print(gyroADC[2]);
+      SERIAL_PORT.print(gyroADC_BD[2]);
       SERIAL_PORT.println("");
     #endif
+    gyroADC_BD[0] *= gRes;    // Raw -> [dps]
+    gyroADC_BD[1] *= gRes;    // Raw -> [dps]
+    gyroADC_BD[2] *= gRes;    // Raw -> [dps]
+
   }
 }
 
@@ -944,12 +947,14 @@ bool cICM20948::mag_get_adc( void )
 
     //#define USE_MAG_DEBUG_X2
     #if defined(USE_MAG_DEBUG_X2)
-      SERIAL_PORT.print(F("Raw:0,0,0,0,0,0,"));
-      SERIAL_PORT.print(magADC_BD[0]);
+      //SERIAL_PORT.print(F("Raw:0,0,0,0,0,0,"));
+      //SERIAL_PORT.print(F("Raw: 0,0,0,0,0,0,"));
       SERIAL_PORT.print(F(","));
-      SERIAL_PORT.print(magADC_BD[1]);
+      SERIAL_PORT.print(magRAW[0]);
       SERIAL_PORT.print(F(","));
-      SERIAL_PORT.print(magADC_BD[2]);
+      SERIAL_PORT.print(magRAW[1]);
+      SERIAL_PORT.print(F(","));
+      SERIAL_PORT.print(magRAW[2]);
       //SERIAL_PORT.print(F(","));
       //SERIAL_PORT.println(accuracy);
       SERIAL_PORT.println("");

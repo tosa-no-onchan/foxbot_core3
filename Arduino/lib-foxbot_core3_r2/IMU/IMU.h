@@ -32,9 +32,13 @@
 //#include "BNO086.h"
 
 //#include "ADAF_BNO086.h"
-//#include "ADAF_BNO055.h"
 
-#if defined(USE_MADWICK)
+//#include "ICM42688.h"
+
+#if defined(USE_DUAL_FILTERS)
+  #include "MadgwickAHRS.h"
+  #include "MahonyAHRS.h"
+#elif defined(USE_MADWICK)
   #include "MadgwickAHRS.h"
 #elif defined(USE_MADWICK_2)
   #include "MadgwickAHRS_2.h"
@@ -86,8 +90,8 @@ public:
     cBNO086 SEN;
   #elif defined(ADAF_BNO086_IMU)
     cADAF_BNO086 SEN;
-  #elif defined(ADAF_BNO055_IMU)
-    cADAF_BNO055 SEN;
+  #elif defined(ICM42688_IMU)
+    cICM42688 SEN;
   #endif
  
 	int16_t angle[3];
@@ -96,11 +100,13 @@ public:
   // changed by nishi 2025.3.17
   double  quat[4]={1.0, 0.0, 0.0, 0.0};
 	double quatRAW[4];		// changed by nishi 2025.3.14
+	double quatRAW2[4];		// changed by nishi 2025.3.14
   double  quatZero[4];
   double  quatZeroK[4]={1.0, 0.0, 0.0, 0.0};
   //float   quat_tmp[4];
   // changed by nishi 2025.3.17
   double   quat_tmp[4];
+  double   quat2_tmp[4];
   //float   quat_tmp_prev[4];
   // changed by nishi 2025.3.17
   double   quat_tmp_prev[4];
@@ -170,8 +176,10 @@ public:
 
 
 private:
-
-  #if defined(USE_MADWICK) || defined(USE_MADWICK_2)
+  #if defined(USE_DUAL_FILTERS)
+    Madgwick filter;
+    Mahony filter2;
+  #elif defined(USE_MADWICK) || defined(USE_MADWICK_2)
     Madgwick filter;
   #elif defined(USE_MAHONY)
     Mahony filter;

@@ -110,7 +110,10 @@ uint8_t cIMU::begin( uint32_t hz ){
       digitalWrite(LED_BUILTIN, LOW);		// light OFF
     #endif
 
-    #if defined(USE_MADWICK) || defined(USE_MADWICK_2)
+    #if defined(USE_DUAL_FILTERS)
+      filter.begin();
+      filter2.begin();
+    #elif defined(USE_MADWICK) || defined(USE_MADWICK_2)
       filter.begin();
     #endif
 
@@ -380,10 +383,10 @@ bool cIMU::computeIMU( void ){
   #endif
 
   #if defined(USE_GRYO_NISHI) || defined(USE_AG_NISHI) || defined(USE_AGM_NISHI)
-    #if defined(BNO086_IMU) || defined(ADAF_BNO086_IMU) || defined(ADAF_BNO055_IMU)
+    #if defined(BNO086_IMU) || defined(ADAF_BNO086_IMU) || defined(ADAF_BNO055_IMU) || defined(ICM20948_IMU) || defined(ICM42688_IMU)
       gx0 = SEN.gyroADC_BD[0];    // [dps] or [rds]
-      gy0 = SEN.gyroADC_BD[1];    // [dps]
-      gz0 = SEN.gyroADC_BD[2];    // [dps]
+      gy0 = SEN.gyroADC_BD[1];    // [dps] or [rds]
+      gz0 = SEN.gyroADC_BD[2];    // [dps] or [rds]
     #else
       gx0 = SEN.gyroADC[0]*SEN.gRes;    // data [dps]
       gy0 = SEN.gyroADC[1]*SEN.gRes;    // [dps]
@@ -637,8 +640,32 @@ bool cIMU::computeIMU( void ){
   process_time      = cur_process_time-prev_process_time;
   prev_process_time = cur_process_time;
 
-  #if defined(USE_MADWICK) || defined(USE_MADWICK_2) || defined(USE_MAHONY)
-    #if defined(USE_MADWICK)
+  #if defined(USE_MADWICK) || defined(USE_MADWICK_2) || defined(USE_MAHONY) || defined(USE_DUAL_FILTERS)
+    #if defined(USE_DUAL_FILTERS)
+      filter.invSampleFreq = (float)process_time/1000000.0f;
+      #if defined(IMU_SENSER6)
+        filter.MadgwickAHRSupdateIMU(gx0, gy0, gz0, ax0, ay0, az0);
+      #else
+        filter.MadgwickAHRSupdate(gx0, gy0, gz0, ax0, ay0, az0, mx0, my0, mz0);
+      #endif
+      quat_tmp[0] = filter.q0;  // W
+      quat_tmp[1] = filter.q1;  // X
+      quat_tmp[2] = filter.q2;  // Y
+      quat_tmp[3] = filter.q3;  // Z
+
+      #if defined(IMU_SENSER6)
+        filter2.MahonyAHRSupdateIMU(gx0, gy0, gz0, ax0, ay0, az0);
+        //filter.MadgwickAHRSupdateIMU(gx0, gy0, gz0, ax0, ay0, az0);
+      #else
+        filter2.MahonyAHRSupdate(gx0, gy0, gz0, ax0, ay0, az0, mx0, my0, mz0);
+        //filter.MadgwickAHRSupdate(gx0, gy0, gz0, ax0, ay0, az0, mx0, my0, mz0);
+      #endif
+      quat2_tmp[0] = filter2.q0;  // W
+      quat2_tmp[1] = filter2.q1;  // X
+      quat2_tmp[2] = filter2.q2;  // Y
+      quat2_tmp[3] = filter2.q3;  // Z
+
+    #elif defined(USE_MADWICK)
       filter.invSampleFreq = (float)process_time/1000000.0f;
       #if defined(IMU_SENSER6)
         filter.MadgwickAHRSupdateIMU(gx0, gy0, gz0, ax0, ay0, az0);
@@ -826,7 +853,7 @@ bool cIMU::computeIMU( void ){
       cali_tf ++;
     }
     
-  #elif defined(USE_MADWICK) || defined(USE_MADWICK_2) || defined(USE_MAHONY)
+  #elif defined(USE_MADWICK) || defined(USE_MADWICK_2) || defined(USE_MAHONY) || defined(USE_DUAL_FILTERS)
     // キャリブレーション中です。
     if(calibratingMad_f == false){
       //#define TEST_11_7
@@ -839,7 +866,7 @@ bool cIMU::computeIMU( void ){
         if(calibratingMad == IMU_CALI_COUNT_DMP_PRE){
           d[1]=d[2]=d[3]=0;
         }
-        #if defined(USE_MADWICK) || defined(USE_MAHONY)
+        #if defined(USE_MADWICK) || defined(USE_MAHONY) || defined(USE_DUAL_FILTERS)
           d[1] += filter.q1;  // X
           d[2] += filter.q2;  // y
           d[3] += filter.q3;  // z
@@ -891,7 +918,13 @@ bool cIMU::computeIMU( void ){
     }
     // キャリブレーション完了後です。
     else{
-      #if defined(USE_MADWICK) || defined(USE_MAHONY)
+      #if defined(USE_DUAL_FILTERS)
+        quatRAW2[0] = filter2.q0;  // W
+        quatRAW2[1] = filter2.q1;  // X
+        quatRAW2[2] = filter2.q2;  // Y
+        quatRAW2[3] = filter2.q3;  // Z
+      #endif
+      #if defined(USE_MADWICK) || defined(USE_MAHONY) || defined(USE_DUAL_FILTERS)
         quatRAW[0] = filter.q0;  // W
         quatRAW[1] = filter.q1;  // X
         quatRAW[2] = filter.q2;  // Y
@@ -906,9 +939,31 @@ bool cIMU::computeIMU( void ){
       // 起動時の向きの補正をする。
       #define USE_POSE_ADJUST
       #if defined(USE_POSE_ADJUST)
+        // Madgwick の zを補正
         foxbot3::Kakezan(quatZeroK, quatRAW, quat);
+        #if defined(USE_DUAL_FILTERS)
+          double roll1,pitch1,yaw1;
+          double roll2,pitch2,yaw2;
+          // get adjusted roll,pitch,yaw
+          foxbot3::QuaternionToEulerAngles(quat, roll1, pitch1, yaw1);
+          // get Mahony roll,pitch,yaw
+          foxbot3::QuaternionToEulerAngles(quatRAW2, roll2, pitch2, yaw2);
+          // mixd Mahony x,y and Madgwick adjusted z
+          foxbot3::euler_to_quat<double>(roll2, pitch2, yaw1,quat);
+
+          // Mahony の q3 を書き換える。
+          // get Madgwick roll,pitch,yaw
+          foxbot3::QuaternionToEulerAngles(quatRAW, roll1, pitch1, yaw1);
+          foxbot3::euler_to_quat<double>(roll2, pitch2, yaw1,quatRAW2);
+
+          filter2.q0 = quatRAW2[0];
+          filter2.q1 = quatRAW2[1];
+          filter2.q2 = quatRAW2[2];
+          filter2.q3 = quatRAW2[3];
+
+        #endif
       #else
-        #if defined(USE_MADWICK) || defined(USE_MAHONY)
+        #if defined(USE_MADWICK) || defined(USE_MAHONY) || defined(USE_DUAL_FILTERS)
           quat[0] = filter.q0;  // W
           quat[1] = filter.q1;  // X
           quat[2] = filter.q2;  // Y
