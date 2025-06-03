@@ -834,16 +834,16 @@ void cICM20948::acc_common(){
       }
 			a[0] += accADC[0];             // Sum up 512 readings
 			a[1] += accADC[1];             // Sum up 512 readings
-			a[2] += accADC[2];             // Sum up 512 readings
+			//a[2] += accADC[2];             // Sum up 512 readings
 
       if(calibratingA >= (MPU_CALI_COUNT_ACC_PRE+MPU_CALI_COUNT_ACC -1)){
         accZero[0] = a[0] / MPU_CALI_COUNT_ACC;
         accZero[1] = a[1] / MPU_CALI_COUNT_ACC;
-        accZero[2] = a[2] / MPU_CALI_COUNT_ACC;
+        //accZero[2] = a[2] / MPU_CALI_COUNT_ACC;
         // test by nishi 2025.3.25
         //accZero[0]=accZero[1]=accZero[2]=0;
 
-        accZeroSum=accZero[0]+accZero[1]+accZero[2];
+        //accZeroSum=accZero[0]+accZero[1]+accZero[2];
 
         // 此処で、acc の内積を出す。
         //accIMZero = sqrt(accZero[0] * accZero[0] + accZero[1] * accZero[1] + accZero[2] * accZero[2]);
@@ -856,8 +856,8 @@ void cICM20948::acc_common(){
     }
   }
   if(calibratingA_f != 0){
-    //accADC[0] -=accZero[0];
-    //accADC[1] -=accZero[1];
+    accADC[0] -=accZero[0];
+    accADC[1] -=accZero[1];
     //accADC[2] -=accZero[2];
   }
 }
