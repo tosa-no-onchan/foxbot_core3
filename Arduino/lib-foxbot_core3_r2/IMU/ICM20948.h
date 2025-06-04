@@ -70,8 +70,8 @@
 	//#define USE_AGM_NISHI		// DMP INV_ICM20948_SENSOR_GEOMAGNETIC_FIELD           (32-bit calibrated compass)
 
 	//#define USE_DUAL_FILTERS
-	#define USE_MADWICK
-	//#define USE_MAHONY
+	//#define USE_MADWICK
+	#define USE_MAHONY
 
 	// add by nishi 2021.10.7
 	#define IMU_SENSER6		// 9軸の時は、コメントにする。
@@ -123,11 +123,12 @@
 #if defined(IMU_SENSER6)
 	#define MADWICK_beta 0.1f
 	#if defined(USE_DUAL_FILTERS)
-		#define MAHONY_twoKi 5.0f		// こちらが、良いみたい
+		//#define MAHONY_twoKi 5.0f		// こちらが、良いみたい
+		//#define MAHONY_twoKi 10.0f
+		#define MAHONY_twoKi 20.0f
 	#else
 		#define MAHONY_twoKi 1.0f
 		//#define MAHONY_twoKi 5.0f		// こちらが、良いみたい
-		//#define MAHONY_twoKi 4.0f
 	#endif
 #else
 	//#define MADWICK_beta 1.0f		// 落ち着くのに時間がかかる。
@@ -336,7 +337,8 @@ public:
 	int16_t  accADC[3];
 	float    accADC_BD[3];	// scale data add by nishi from ICM-20948
 	int16_t  accRAW[3];
-	int16_t	 accZero[3];
+	//int16_t	 accZero[3];
+	float	 accZero[3];
 	int32_t	 accZeroSum;
 	float    accIMZero;			// add by nishi acc 内積
 

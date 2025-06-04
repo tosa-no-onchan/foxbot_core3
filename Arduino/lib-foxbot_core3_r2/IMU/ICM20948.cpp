@@ -770,9 +770,9 @@ void cICM20948::acc_get_adc( void ){
   //uint8_t rawADC[6];
 
   // scaled data Acc [mg]
-  accADC_BD[0] = myICM.accX();
-  accADC_BD[1] = myICM.accY();
-  accADC_BD[2] = myICM.accZ();
+  //accADC_BD[0] = myICM.accX();
+  //accADC_BD[1] = myICM.accY();
+  //accADC_BD[2] = myICM.accZ();
 
   //#define USE_ACC_DEBUG_X1
   #if defined(USE_ACC_DEBUG_X1)
@@ -792,11 +792,12 @@ void cICM20948::acc_get_adc( void ){
   //#define USE_ACC_DEBUG_X2
   #if defined(USE_ACC_DEBUG_X2)
     SERIAL_PORT.print(F("Raw:"));
-    SERIAL_PORT.print(accRAW[0]);
-    SERIAL_PORT.print(F(","));
-    SERIAL_PORT.print(accRAW[1]);
-    SERIAL_PORT.print(F(","));
-    SERIAL_PORT.print(accRAW[2]);
+    //SERIAL_PORT.print(accRAW[0]);   // -113 から -132
+    //SERIAL_PORT.print(F(","));
+    //SERIAL_PORT.print(accRAW[1]);   // 358 から 418
+    //SERIAL_PORT.print(F(","));
+    SERIAL_PORT.print(accRAW[2]);   // 8110 から 8130
+    SERIAL_PORT.println("");
   #endif
 
   // レゾルーションを掛けた値?  agmt.fss.a を元に、G に変換した値
@@ -837,9 +838,9 @@ void cICM20948::acc_common(){
 			//a[2] += accADC[2];             // Sum up 512 readings
 
       if(calibratingA >= (MPU_CALI_COUNT_ACC_PRE+MPU_CALI_COUNT_ACC -1)){
-        accZero[0] = a[0] / MPU_CALI_COUNT_ACC;
-        accZero[1] = a[1] / MPU_CALI_COUNT_ACC;
-        //accZero[2] = a[2] / MPU_CALI_COUNT_ACC;
+        accZero[0] = (float)a[0] / MPU_CALI_COUNT_ACC;
+        accZero[1] = (float)a[1] / MPU_CALI_COUNT_ACC;
+        //accZero[2] = (float)a[2] / MPU_CALI_COUNT_ACC;
         // test by nishi 2025.3.25
         //accZero[0]=accZero[1]=accZero[2]=0;
 
@@ -848,7 +849,7 @@ void cICM20948::acc_common(){
         // 此処で、acc の内積を出す。
         //accIMZero = sqrt(accZero[0] * accZero[0] + accZero[1] * accZero[1] + accZero[2] * accZero[2]);
         //accZero[YAW] -= ACC_1G;
-        //accZero[YAW] = 0;   // 注) これをすると、海抜からの標高値になる。しなければ、起動地点の標高が原点となる。
+        //accZero[YAW] = 0;   // acc_z は、バイアス補正をしない。
 
         calibratingA_f=1;
         calibratingA=0;
@@ -856,9 +857,35 @@ void cICM20948::acc_common(){
     }
   }
   if(calibratingA_f != 0){
-    accADC[0] -=accZero[0];
-    accADC[1] -=accZero[1];
+    //accADC[0] -=accZero[0];
+    //accADC[1] -=accZero[1];
     //accADC[2] -=accZero[2];
+
+    accADC_BD[0] = (float)accADC[0] - accZero[0];
+    accADC_BD[1] = (float)accADC[1] - accZero[1];
+    accADC_BD[2] = (float)accADC[2];
+
+    //#define USE_ACC_DEBUG_X3
+    #if defined(USE_ACC_DEBUG_X3)
+      SERIAL_PORT.print(F("accADC:"));
+      //SERIAL_PORT.print(accADC[0]);   // 13 から -18
+      //SERIAL_PORT.print(F(","));
+      SERIAL_PORT.print(accADC[1]);   // 8 から　-22
+      //SERIAL_PORT.print(F(","));
+      //SERIAL_PORT.print(accADC[2]);   // 8110 から 8130
+      SERIAL_PORT.println("");
+    #endif
+
+    accADC_BD[0] *= aRes; // [g]
+    accADC_BD[1] *= aRes; // [g]
+    accADC_BD[2] *= aRes; // [g]
+
+    // ノーマライズしてみる
+    float accIMZero = sqrt(accADC_BD[0] * accADC_BD[0] + accADC_BD[1] * accADC_BD[1] + accADC_BD[2] * accADC_BD[2]);
+    accADC_BD[0] /= accIMZero;
+    accADC_BD[1] /= accIMZero;
+    accADC_BD[2] /= accIMZero;
+
   }
 }
 

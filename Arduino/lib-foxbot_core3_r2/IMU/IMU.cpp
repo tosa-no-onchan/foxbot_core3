@@ -350,7 +350,7 @@ bool cIMU::computeIMU( void ){
   #endif
 
   #if defined(USE_ACC_NISHI) || defined(USE_AG_NISHI) || defined(USE_AGM_NISHI)
-    #if defined(BNO086_IMU) || defined(ADAF_BNO086_IMU) || defined(ADAF_BNO055_IMU) || defined(ICM42688_IMU)
+    #if defined(BNO086_IMU) || defined(ADAF_BNO086_IMU) || defined(ADAF_BNO055_IMU) || defined(ICM42688_IMU) || defined(ICM20948_IMU)
       ax0  = SEN.accADC_BD[0];
       ay0  = SEN.accADC_BD[1];
       az0  = SEN.accADC_BD[2];
@@ -364,7 +364,6 @@ bool cIMU::computeIMU( void ){
       //ax0 /= accIMZero;
       //ay0 /= accIMZero;
       //az0 /= accIMZero;
-
 
       //ax0 = SEN.accADC_BD[0]; // scaled data Acc [mg]
       //ay0 = SEN.accADC_BD[1]; // scaled data Acc [mg]
