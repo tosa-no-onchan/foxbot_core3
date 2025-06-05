@@ -880,11 +880,11 @@ void cICM20948::acc_common(){
     accADC_BD[1] *= aRes; // [g]
     accADC_BD[2] *= aRes; // [g]
 
-    // ノーマライズしてみる
-    float accIMZero = sqrt(accADC_BD[0] * accADC_BD[0] + accADC_BD[1] * accADC_BD[1] + accADC_BD[2] * accADC_BD[2]);
-    accADC_BD[0] /= accIMZero;
-    accADC_BD[1] /= accIMZero;
-    accADC_BD[2] /= accIMZero;
+    // ノーマライズしてみる。
+    //float accIMZero = sqrt(accADC_BD[0] * accADC_BD[0] + accADC_BD[1] * accADC_BD[1] + accADC_BD[2] * accADC_BD[2]);
+    //accADC_BD[0] /= accIMZero;
+    //accADC_BD[1] /= accIMZero;
+    //accADC_BD[2] /= accIMZero;
 
   }
 }
