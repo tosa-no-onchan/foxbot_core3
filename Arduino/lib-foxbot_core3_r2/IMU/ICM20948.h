@@ -52,6 +52,8 @@
 	//#define USE_GYRO_2000
 
 	#define USE_SCALE_DATA
+	//#define USE_ODR500
+	#define USE_ODR1K
 
 	#define USE_IMU_NO1
 	//#define USE_IMU_NO2
@@ -70,8 +72,8 @@
 	//#define USE_AGM_NISHI		// DMP INV_ICM20948_SENSOR_GEOMAGNETIC_FIELD           (32-bit calibrated compass)
 
 	//#define USE_DUAL_FILTERS
-	//#define USE_MADWICK
-	#define USE_MAHONY
+	#define USE_MADWICK
+	//#define USE_MAHONY
 
 	// add by nishi 2021.10.7
 	#define IMU_SENSER6		// 9軸の時は、コメントにする。
@@ -85,9 +87,11 @@
 	//#define USE_GYRO_2000		// 9軸の時は、こちらか。
 
 	#define USE_SCALE_DATA
+	//#define USE_ODR500
+	#define USE_ODR1K
 
-	//#define USE_IMU_NO1
-	#define USE_IMU_NO2
+	#define USE_IMU_NO1
+	//#define USE_IMU_NO2
 	//#define USE_IMU_NO3
 
 #endif
@@ -106,10 +110,10 @@
 	#define IMU_CALI_COUNT_DMP_PRE 2000
 	#define IMU_CALI_COUNT_DMP 2000
 #else
-	#define MPU_CALI_COUNT_GYRO_PRE 2000
-	#define MPU_CALI_COUNT_GYRO 500
-	#define MPU_CALI_COUNT_ACC_PRE 2000
-	#define MPU_CALI_COUNT_ACC 500
+	#define MPU_CALI_COUNT_GYRO_PRE 1200
+	#define MPU_CALI_COUNT_GYRO 2400
+	#define MPU_CALI_COUNT_ACC_PRE 1200
+	#define MPU_CALI_COUNT_ACC 2400
 	#define MPU_CALI_COUNT_MAG 100
 	// DMP6 28[Hz]
 	#define MPU_CALI_COUNT_DMP 200
@@ -124,8 +128,8 @@
 	#define MADWICK_beta 0.1f
 	#if defined(USE_DUAL_FILTERS)
 		//#define MAHONY_twoKi 5.0f		// こちらが、良いみたい
-		//#define MAHONY_twoKi 10.0f
-		#define MAHONY_twoKi 20.0f
+		#define MAHONY_twoKi 10.0f
+		//#define MAHONY_twoKi 20.0f
 	#else
 		#define MAHONY_twoKi 1.0f
 		//#define MAHONY_twoKi 5.0f		// こちらが、良いみたい
@@ -170,23 +174,41 @@
 
 
 #if defined(USE_IMU_NO1)
-	#if defined(USE_GYRO_500)
+	#if defined(USE_GYRO_250)
 		//#define GYRO_NOISE_CUT_OFF 8
 		#define GYRO_NOISE_CUT_OFF 10.0
+	#elif defined(USE_GYRO_500)
+		//#define GYRO_NOISE_CUT_OFF 8
+		#define GYRO_NOISE_CUT_OFF 10.0
+	#elif defined(USE_GYRO_1000)
+		#define GYRO_NOISE_CUT_OFF 1.7
 	#elif defined(USE_GYRO_2000)
 		#define GYRO_NOISE_CUT_OFF 1.7
 		//#define GYRO_NOISE_CUT_OFF 2.0
 	#endif
+	#if defined(USE_ACC_4G)
+		#define ACC_NOISE_CUT_OFF 20
+	#endif
 #elif defined(USE_IMU_NO2)
-	#if defined(USE_GYRO_500)
+	#if defined(USE_GYRO_250)
+		//#define GYRO_NOISE_CUT_OFF 8
 		#define GYRO_NOISE_CUT_OFF 10.0
+	#elif defined(USE_GYRO_500)
+		#define GYRO_NOISE_CUT_OFF 10.0
+	#elif defined(USE_GYRO_1000)
+		#define GYRO_NOISE_CUT_OFF 1.7
 	#elif defined(USE_GYRO_2000)
 		#define GYRO_NOISE_CUT_OFF 1.7
 		//#define GYRO_NOISE_CUT_OFF 2.0
 	#endif
 #else
-	#if defined(USE_GYRO_500)
+	#if defined(USE_GYRO_250)
+		//#define GYRO_NOISE_CUT_OFF 8
 		#define GYRO_NOISE_CUT_OFF 10.0
+	#elif defined(USE_GYRO_500)
+		#define GYRO_NOISE_CUT_OFF 10.0
+	#elif defined(USE_GYRO_1000)
+		#define GYRO_NOISE_CUT_OFF 1.7
 	#elif defined(USE_GYRO_2000)
 		#define GYRO_NOISE_CUT_OFF 1.7
 		//#define GYRO_NOISE_CUT_OFF 2.0

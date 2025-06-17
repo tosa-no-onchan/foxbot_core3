@@ -100,8 +100,12 @@ cICM20948::cICM20948()
   #else
     //begin_update_rate = 300;
     //begin_update_rate = 400;
-    begin_update_rate = 500;
-    //begin_update_rate = 600;  // 実測 565[Hz]
+    #if defined(USE_ODR500)
+      begin_update_rate = 500;
+      //begin_update_rate = 600;  // 実測 565[Hz]
+    #elif defined(USE_ODR1K)
+      begin_update_rate = 1000;   // 実測 612[Hz]
+    #endif
   #endif
   magADC[0]=magADC[1]=magADC[2]=0;
   magADC_BD[0]=magADC_BD[1]=magADC_BD[2]= 0.0;
@@ -195,8 +199,8 @@ bool cICM20948::begin()
   //delay(250);
 
   // Now wake the sensor up
-  myICM.sleep(false);
-  myICM.lowPower(false);
+  //myICM.sleep(false);
+  //myICM.lowPower(false);
 
   // Disable I2C interface, use SPI
   //spiWriteByte(ICM20948_REG_USER_CTRL, ICM20948_BIT_I2C_IF_DIS);
@@ -249,23 +253,8 @@ bool cICM20948::init( void ){
   // In this advanced example we'll cover how to do a more fine-grained setup of your sensor
   SERIAL_PORT.println("Device connected!");
 
-  // Here we are doing a SW reset to make sure the device starts in a known state
-  // リセットしたら、再度、myICM.startupMagnetometer() が必要です。
-  // 下記は、USE_AGM_NISHI の時は、使わない事。
-  #if !defined(USE_AGM_NISHI)
-    myICM.swReset();
-    if (myICM.status != ICM_20948_Stat_Ok)
-    {
-      SERIAL_PORT.print(F("Software Reset returned: "));
-      SERIAL_PORT.println(myICM.statusString());
-    }
-    delay(250);
-    // Now wake the sensor up
-    myICM.sleep(false);
-    myICM.lowPower(false);
-  #endif
-
   #if !defined(USE_DMP_NISHI) && !defined(USE_AGM_NISHI)
+
     // Gyro and Acc を使う
     #if defined(USE_ACC_NISHI) || defined(USE_GRYO_NISHI) || defined(USE_MAG)
 
@@ -427,6 +416,7 @@ bool cICM20948::init( void ){
     #endif
   #else
     /*
+    *
     * add 9 axis fusion Quarternion with DMP3 start
     * 注) ICM220948C.h の #define ICM_20948_USE_DMP を有効にしないといけない。
     * 注2) 上記を、有効にすると、Magnet が取れなくなる。
@@ -515,7 +505,10 @@ bool cICM20948::init( void ){
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Cpass_Calibr, 0) == ICM_20948_Stat_Ok); // Set to the maximum
     #else
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat6, 0) == ICM_20948_Stat_Ok); // Set to the maximum
-      success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat6, 1) == ICM_20948_Stat_Ok); // Set to the 27.5
+      //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat6, 1) == ICM_20948_Stat_Ok); // Set to the 27.5
+      // myICM.initializeDMP() の中でも設定しているので、必要なのか? --> 必要みたい
+      success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Quat6, 2) == ICM_20948_Stat_Ok); // Set to the  19 changed by nishi 2025.6.8
+
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Accel, 0) == ICM_20948_Stat_Ok); // Set to the maximum
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Gyro, 0) == ICM_20948_Stat_Ok); // Set to the maximum
       //success &= (myICM.setDMPODRrate(DMP_ODR_Reg_Gyro_Calibr, 0) == ICM_20948_Stat_Ok); // Set to the maximum
@@ -818,7 +811,8 @@ void cICM20948::acc_get_adc( void ){
 * but z is set to zero;
 */
 void cICM20948::acc_common(){
-	static int32_t a[3];
+	//static int32_t a[3];
+	static int64_t a[3];
 
   if(calibratingA_f == 0){
     calibratingA++;
@@ -835,12 +829,12 @@ void cICM20948::acc_common(){
       }
 			a[0] += accADC[0];             // Sum up 512 readings
 			a[1] += accADC[1];             // Sum up 512 readings
-			//a[2] += accADC[2];             // Sum up 512 readings
+			a[2] += accADC[2];             // Sum up 512 readings
 
       if(calibratingA >= (MPU_CALI_COUNT_ACC_PRE+MPU_CALI_COUNT_ACC -1)){
         accZero[0] = (float)a[0] / MPU_CALI_COUNT_ACC;
         accZero[1] = (float)a[1] / MPU_CALI_COUNT_ACC;
-        //accZero[2] = (float)a[2] / MPU_CALI_COUNT_ACC;
+        accZero[2] = (float)a[2] / MPU_CALI_COUNT_ACC;
         // test by nishi 2025.3.25
         //accZero[0]=accZero[1]=accZero[2]=0;
 
@@ -867,12 +861,35 @@ void cICM20948::acc_common(){
 
     //#define USE_ACC_DEBUG_X3
     #if defined(USE_ACC_DEBUG_X3)
-      SERIAL_PORT.print(F("accADC:"));
-      //SERIAL_PORT.print(accADC[0]);   // 13 から -18
+      SERIAL_PORT.print(F("accADC_BD:"));
+      //SERIAL_PORT.print(accADC_BD[0]);   // 16.09 から -13.9
       //SERIAL_PORT.print(F(","));
-      SERIAL_PORT.print(accADC[1]);   // 8 から　-22
+      //SERIAL_PORT.print(accADC_BD[1]);   //  18.82 から　-22.08
       //SERIAL_PORT.print(F(","));
-      //SERIAL_PORT.print(accADC[2]);   // 8110 から 8130
+      SERIAL_PORT.print(accADC_BD[2] - accZero[2]);   //  +_20 
+      SERIAL_PORT.println("");
+    #endif
+
+    // Acc 0 noise cut off
+    // ノイズを削ってみる。
+    if (abs(accADC_BD[0]) <= ACC_NOISE_CUT_OFF){
+      accADC_BD[0] = 0;
+    }
+    if (abs(accADC_BD[1]) <= ACC_NOISE_CUT_OFF){
+      accADC_BD[1] = 0;
+    }
+    if (abs(accADC_BD[2]-accZero[2]) <= ACC_NOISE_CUT_OFF){
+      accADC_BD[2] = accZero[2];
+    }
+
+    //#define USE_ACC_DEBUG_X4
+    #if defined(USE_ACC_DEBUG_X4)
+      SERIAL_PORT.print(F("accADC_BD:"));       // non filter
+      SERIAL_PORT.print(accADC_BD[0]);     // 28.73 から -20.27
+      //SERIAL_PORT.print(F(","));
+      //SERIAL_PORT.print(accADC_BD[1]);       // 28.93 から -20.07
+      //SERIAL_PORT.print(F(","));
+      //SERIAL_PORT.print(accADC_BD[2]-accZero[2]);   // 28.89  から -22.81
       SERIAL_PORT.println("");
     #endif
 
@@ -1300,7 +1317,9 @@ bool cICM20948::dmp_get_adc(){
         //if(!isnan(q0) && (data.Quat9.Data.Accuracy >= 0 && data.Quat9.Data.Accuracy <= 500)){
         // 2025.4.3 までの設定
         //if(!isnan(q0) && (data.Quat9.Data.Accuracy >= 0 && data.Quat9.Data.Accuracy <= 600)){
-        if(!isnan(q0)){
+        if(!isnan(q0) && (data.Quat9.Data.Accuracy >= 0)){
+        //if(data.Quat9.Data.Accuracy >= 0 && data.Quat9.Data.Accuracy <= 600){
+        //if(!isnan(q0)){
 
           //#define TRACE_DMP1_X
           #if defined(TRACE_DMP1_X)
@@ -1345,10 +1364,10 @@ bool cICM20948::dmp_get_adc(){
               if(calibratingD >= MPU_CALI_COUNT_DMP9*2-1){
                 // DMP の初期誤差を計算する。
                 // Z軸のみ補正します。by nishi 2025.3.17
-                //quatZero[1] = d[1] / MPU_CALI_COUNT_DMP9;
-                quatZero[1] = 0.0;
-                //quatZero[2] = d[2] / MPU_CALI_COUNT_DMP9;
-                quatZero[2] = 0.0;
+                quatZero[1] = d[1] / MPU_CALI_COUNT_DMP9;
+                //quatZero[1] = 0.0;
+                quatZero[2] = d[2] / MPU_CALI_COUNT_DMP9;
+                //quatZero[2] = 0.0;
                 quatZero[3] = d[3] / MPU_CALI_COUNT_DMP9; 
 
                 calibratingD_f = 1;
@@ -1456,6 +1475,9 @@ bool cICM20948::dmp_get_adc(){
             //SERIAL_PORT.print(q3, 3);
             SERIAL_PORT.print(F(">#8 Accuracy:"));
             SERIAL_PORT.println(data.Quat9.Data.Accuracy);
+            SERIAL_PORT.print(F(", isnan(q0):"));
+            SERIAL_PORT.print(isnan(q0));
+            SERIAL_PORT.println("");
           #endif
         }
       }
@@ -1495,10 +1517,10 @@ bool cICM20948::dmp_get_adc(){
               if(calibratingD >= MPU_CALI_COUNT_DMP*2-1){
                 // DMP の初期誤差を計算する。
                 // Z軸のみ補正します。by nishi 2025.3.17
-                //quatZero[1] = d[1] / MPU_CALI_COUNT_DMP;
-                quatZero[1] = 0.0;
-                //quatZero[2] = d[2] / MPU_CALI_COUNT_DMP;
-                quatZero[2] = 0.0;
+                //quatZero[1] = 0.0;
+                quatZero[1] = d[1] / MPU_CALI_COUNT_DMP;
+                //quatZero[2] = 0.0;
+                quatZero[2] = d[2] / MPU_CALI_COUNT_DMP;
                 quatZero[3] = d[3] / MPU_CALI_COUNT_DMP; 
 
                 calibratingD_f=1;
@@ -1556,6 +1578,12 @@ bool cICM20948::dmp_get_adc(){
             SERIAL_PORT.print(q2, 3);
             SERIAL_PORT.print(F(" Q3:"));
             SERIAL_PORT.println(q3, 3);
+          #endif
+        }
+        else{
+          #define TEST_W0_X9
+          #if defined(TEST_W0_X9)
+            SERIAL_PORT.println("dmp_get_adc() #9 NG");
           #endif
         }
       }
@@ -1874,9 +1902,11 @@ bool cICM20948::mag_cali_get_done()
 }
 
 
-//#define USE_DMP_INIT_CUST
+#define USE_DMP_INIT_CUST
 #if defined(USE_DMP_NISHI) && defined(USE_DMP_INIT_CUST)
-///
+//---
+// org SparkFun_ICM-20948_ArduinoLibrary/src/ICM_20948.cpp
+//---
 // initializeDMP is a weak function. Let's overwrite it so we can increase the sample rate
 ICM_20948_Status_e ICM_20948::initializeDMP(void)
 {
@@ -1972,14 +2002,24 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
   #endif
                    
 
-  myFSS.g = dps2000;     // (ICM_20948_GYRO_CONFIG_1_FS_SEL_e)
+  #if defined(USE_GYRO_250)
+    myFSS.g = dps250;
+  #elif defined(USE_GYRO_500)
+    myFSS.g = dps500;
+  #elif defined(USE_GYRO_1000)
+    myFSS.g = dps1000;
+  #else
+    myFSS.g = dps2000;     // (ICM_20948_GYRO_CONFIG_1_FS_SEL_e)
                          // dps250
                          // dps500
                          // dps1000
                          // dps2000
+  #endif
   result = setFullScale((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), myFSS); if (result > worstResult) worstResult = result;
 
   // add by nishi start
+  //#define USE_DMP_FILTERS
+  #if defined(USE_DMP_FILTERS)
     // Set up Digital Low-Pass Filter configuration
     ICM_20948_dlpcfg_t myDLPcfg;    // Similar to FSS, this uses a configuration structure for the desired sensors
     //myDLPcfg.a = acc_d473bw_n499bw; // (ICM_20948_ACCEL_CONFIG_DLPCFG_e)   original
@@ -1991,14 +2031,16 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
     //myDLPcfg.a =  acc_d5bw7_n8bw3;  // acc_d5bw7_n8bw3   - means 3 db bandwidth is 5.7 hz and nyquist bandwidth is 8.3 hz  -> 2 NG
                                     // acc_d473bw_n499bw   original  1. soso
 
-    #if defined(USE_FOXBOT)
+    #if defined(USE_IMU_NO1)
       //myDLPcfg.a = acc_d111bw4_n136bw;   // acc_d111bw4_n136bw -> 6. OK!
       myDLPcfg.a =  acc_d11bw5_n17bw;  // acc_d11bw5_n17bw   -> 3. Good! ただし #3のばあい
-      #else
+    #elif defined(USE_IMU_NO2)
+      myDLPcfg.a =  acc_d11bw5_n17bw;  // acc_d11bw5_n17bw   -> 3. Madgwick は、こちら!!
+    #else
       //myDLPcfg.a = acc_d246bw_n265bw;     // acc_d246bw_n265bw  -> 7. NG   - means 3db bandwidth is 246 hz and nyquist bandwidth is 265 hz
-      //myDLPcfg.a = acc_d111bw4_n136bw;   // acc_d111bw4_n136bw -> 6. OK!
+      myDLPcfg.a = acc_d111bw4_n136bw;   // acc_d111bw4_n136bw -> 6. OK!
       //myDLPcfg.a = acc_d50bw4_n68bw8; // acc_d50bw4_n68bw8 -> 5. Good! ただし #2 のばあい。Madgwick betaDef 0.1f だとNG
-      myDLPcfg.a =  acc_d11bw5_n17bw;  // acc_d11bw5_n17bw   -> 3. Good! ただし #3のばあい
+      //myDLPcfg.a =  acc_d11bw5_n17bw;  // acc_d11bw5_n17bw   -> 3. Good! ただし #3のばあい
     #endif
 
     //myDLPcfg.g = gyr_d361bw4_n376bw5; // (ICM_20948_GYRO_CONFIG_1_DLPCFG_e)  original
@@ -2010,15 +2052,21 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
     //myDLPcfg.g = gyr_d11bw6_n17bw8;   // gyr_d11bw6_n17bw8  -> 3. Good!  ただし #3のばあい
     //myDLPcfg.g = gyr_d5bw7_n8bw9;     // gyr_d5bw7_n8bw9  -> 2. NG
                                       // gyr_d361bw4_n376bw5  original  1. so so
-    #if defined(USE_FOXBOT)
+    #if defined(USE_IMU_NO1)
       //myDLPcfg.g = gyr_d119bw5_n154bw3;   // gyr_d119bw5_n154bw3  -> 6. OK 
       //myDLPcfg.g =  gyr_d51bw2_n73bw3;  // gyr_d51bw2_n73bw3  -> 5. Good! ただし #2 のばあい。Madgwick betaDef 0.1f だとNG
       myDLPcfg.g = gyr_d11bw6_n17bw8;   // gyr_d11bw6_n17bw8  -> 3. Good!  ただし #3のばあい
+    #elif defined(USE_IMU_NO2)
+      // IMU NO2 は、OK
+      myDLPcfg.g = gyr_d5bw7_n8bw9;     // gyr_d5bw7_n8bw9  -> 2. #2 Madgwick は、こちら!!
     #else
+      //IMU NO3　は、もうすこし!!
       //myDLPcfg.g =  gyr_d151bw8_n187bw6;  // gyr_d151bw8_n187bw6  -> 7.  NG
-      //myDLPcfg.g = gyr_d119bw5_n154bw3;   // gyr_d119bw5_n154bw3  -> 6. OK 
-      //myDLPcfg.g =  gyr_d51bw2_n73bw3;  // gyr_d51bw2_n73bw3  -> 5. Good! ただし #2 のばあい。Madgwick betaDef 0.1f だとNG
-      myDLPcfg.g = gyr_d11bw6_n17bw8;   // gyr_d11bw6_n17bw8  -> 3. Good!  ただし #3のばあい
+      //myDLPcfg.g = gyr_d119bw5_n154bw3;   // gyr_d119bw5_n154bw3  -> 6. NG
+      //myDLPcfg.g =  gyr_d51bw2_n73bw3;  // gyr_d51bw2_n73bw3  -> 5. NG
+      myDLPcfg.g =  gyr_d23bw9_n35bw9;    // gyr_d23bw9_n35bw9   -> 4.  so so  Mahonyは、もうちょい
+      //myDLPcfg.g = gyr_d11bw6_n17bw8;   // gyr_d11bw6_n17bw8  -> 3. Good! Madgwick は、もうちょい。 Mahony は、こちら。まあまあ!!
+      //myDLPcfg.g = gyr_d5bw7_n8bw9;     // gyr_d5bw7_n8bw9  -> 2. NG.
     #endif
 
     result = setDLPFcfg((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), myDLPcfg); if (result > worstResult) worstResult = result;
@@ -2031,14 +2079,18 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
     result = enableDLPF(ICM_20948_Internal_Acc, true); if (result > worstResult) worstResult = result;
 
   // add by nishi end
+  #endif
 
   // The InvenSense Nucleo code also enables the gyro DLPF (but leaves GYRO_DLPFCFG set to zero = 196.6Hz (3dB))
   // We found this by going through the SPI data generated by ZaneL's Teensy-ICM-20948 library byte by byte...
   // The gyro DLPF is enabled by default (GYRO_CONFIG_1 = 0x01) so the following line should have no effect, but we'll include it anyway
+  // 試しにコメントにしてみる。by nishi 2025.6.13 -> 少し改善するが、最終的には、データが止まる。
   result = enableDLPF(ICM_20948_Internal_Gyr, true); if (result > worstResult) worstResult = result;
 
+  // この設定は、どうなのか?ディフォルトは、コメントになっている。
   // Enable interrupt for FIFO overflow from FIFOs through INT_ENABLE_2
   // If we see this interrupt, we'll need to reset the FIFO
+  // 試しに、コメントを取ってみる。by nishi 2025.6.0  --> 変化なし
   //result = intEnableOverflowFIFO( 0x1F ); if (result > worstResult) worstResult = result; // Enable the interrupt on all FIFOs
 
   // Turn off what goes into the FIFO through FIFO_EN_1, FIFO_EN_2
@@ -2058,10 +2110,12 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
   // Set gyro sample rate divider with GYRO_SMPLRT_DIV
   // Set accel sample rate divider with ACCEL_SMPLRT_DIV_2
   ICM_20948_smplrt_t mySmplrt;
+  // ディフォルトは、こちら。
   mySmplrt.g = 19; // ODR is computed as follows: 1.1 kHz/(1+GYRO_SMPLRT_DIV[7:0]). 19 = 55Hz. InvenSense Nucleo example uses 19 (0x13).
   mySmplrt.a = 19; // ODR is computed as follows: 1.125 kHz/(1+ACCEL_SMPLRT_DIV[11:0]). 19 = 56.25Hz. InvenSense Nucleo example uses 19 (0x13).
   //mySmplrt.g = 4; // 225Hz
   //mySmplrt.a = 4; // 225Hz
+  // 下記にしてみる。 by nishi 2025.6.13 --> NG
   //mySmplrt.g = 8; // 112Hz
   //mySmplrt.a = 8; // 112Hz
   result = setSampleRate((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), mySmplrt); if (result > worstResult) worstResult = result;
@@ -2151,17 +2205,58 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
   //            0=1125Hz sample rate, 1=562.5Hz sample rate, ... 4=225Hz sample rate, ...
   //            10=102.2727Hz sample rate, ... etc.
   // @param[in] gyro_level 0=250 dps, 1=500 dps, 2=1000 dps, 3=2000 dps
-  result = setGyroSF(19, 3); if (result > worstResult) worstResult = result; // 19 = 55Hz (see above), 3 = 2000dps (see above)
-  //result = setGyroSF(4, 3); if (result > worstResult) worstResult = result; // 4 = 225Hz (see above), 3 = 2000dps (see above)
-  //result = setGyroSF(8, 3); if (result > worstResult) worstResult = result;   // 8 = 112Hz  (see above), 3 = 2000dps (see above)
+  #if defined(USE_GYRO_250)
+    result = setGyroSF(19, 0); if (result > worstResult) worstResult = result; // 19 = 55Hz (see above), 0 = 250dps (see above)
+    //result = setGyroSF(4, 0); if (result > worstResult) worstResult = result; // 4 = 225Hz (see above), 0 = 250dps (see above)
+    //result = setGyroSF(8, 0); if (result > worstResult) worstResult = result;   // 8 = 112Hz  (see above), 0 = 2500dps (see above)
 
-  // Configure the Gyro full scale
-  // 2000dps : 2^28
-  // 1000dps : 2^27
-  //  500dps : 2^26
-  //  250dps : 2^25
-  const unsigned char gyroFullScale[4] = {0x10, 0x00, 0x00, 0x00}; // 2000dps : 2^28
-  result = writeDMPmems(GYRO_FULLSCALE, 4, &gyroFullScale[0]); if (result > worstResult) worstResult = result;
+    // Configure the Gyro full scale
+    // 2000dps : 2^28
+    // 1000dps : 2^27
+    //  500dps : 2^26
+    //  250dps : 2^25
+    //const unsigned char gyroFullScale[4] = {0x10, 0x00, 0x00, 0x00}; // 2000dps : 2^28
+    const unsigned char gyroFullScale[4] = {0x02, 0x00, 0x00, 0x00}; // 500dps : 2^25
+    result = writeDMPmems(GYRO_FULLSCALE, 4, &gyroFullScale[0]); if (result > worstResult) worstResult = result;
+  #elif defined(USE_GYRO_500)
+    result = setGyroSF(19, 1); if (result > worstResult) worstResult = result; // 19 = 55Hz (see above), 1 = 500dps (see above)
+    //result = setGyroSF(4, 1); if (result > worstResult) worstResult = result; // 4 = 225Hz (see above), 1 = 500dps (see above)
+    //result = setGyroSF(8, 1); if (result > worstResult) worstResult = result;   // 8 = 112Hz  (see above), 1 = 500dps (see above)
+
+    // Configure the Gyro full scale
+    // 2000dps : 2^28
+    // 1000dps : 2^27
+    //  500dps : 2^26
+    //  250dps : 2^25
+    //const unsigned char gyroFullScale[4] = {0x10, 0x00, 0x00, 0x00}; // 2000dps : 2^28
+    const unsigned char gyroFullScale[4] = {0x04, 0x00, 0x00, 0x00}; // 500dps : 2^26
+    result = writeDMPmems(GYRO_FULLSCALE, 4, &gyroFullScale[0]); if (result > worstResult) worstResult = result;
+  #elif defined(USE_GYRO_1000)
+    result = setGyroSF(19, 2); if (result > worstResult) worstResult = result; // 19 = 55Hz (see above), 2 = 1000ps (see above)
+    //result = setGyroSF(4, 2); if (result > worstResult) worstResult = result; // 4 = 225Hz (see above), 2 = 1000dps (see above)
+    //result = setGyroSF(8, 2); if (result > worstResult) worstResult = result;   // 8 = 112Hz  (see above), 2 = 1000dps (see above)
+
+    // Configure the Gyro full scale
+    // 2000dps : 2^28
+    // 1000dps : 2^27
+    //  500dps : 2^26
+    //  250dps : 2^25
+    //const unsigned char gyroFullScale[4] = {0x10, 0x00, 0x00, 0x00}; // 2000dps : 2^28
+    const unsigned char gyroFullScale[4] = {0x08, 0x00, 0x00, 0x00}; // 500dps : 2^27
+    result = writeDMPmems(GYRO_FULLSCALE, 4, &gyroFullScale[0]); if (result > worstResult) worstResult = result;
+  #else
+    result = setGyroSF(19, 3); if (result > worstResult) worstResult = result; // 19 = 55Hz (see above), 3 = 2000dps (see above)
+    //result = setGyroSF(4, 3); if (result > worstResult) worstResult = result; // 4 = 225Hz (see above), 3 = 2000dps (see above)
+    //result = setGyroSF(8, 3); if (result > worstResult) worstResult = result;   // 8 = 112Hz  (see above), 3 = 2000dps (see above)
+
+    // Configure the Gyro full scale
+    // 2000dps : 2^28
+    // 1000dps : 2^27
+    //  500dps : 2^26
+    //  250dps : 2^25
+    const unsigned char gyroFullScale[4] = {0x10, 0x00, 0x00, 0x00}; // 2000dps : 2^28
+    result = writeDMPmems(GYRO_FULLSCALE, 4, &gyroFullScale[0]); if (result > worstResult) worstResult = result;
+  #endif
 
   // Configure the Accel Only Gain: 15252014 (225Hz) 30504029 (112Hz) 61117001 (56Hz)
   const unsigned char accelOnlyGain[4] = {0x03, 0xA4, 0x92, 0x49}; // 56Hz

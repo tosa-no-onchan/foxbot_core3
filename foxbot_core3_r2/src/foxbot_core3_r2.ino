@@ -76,6 +76,7 @@
 // changed by nishi 2025.3.7
 #define ODOM_USE_IMU
 
+//#define DMP_RAW_CHECK
 //#define MADG_DRIFT_CHECK
 
 // Multi task
@@ -238,7 +239,6 @@ void setup(){
 		delay(500);
 	#endif
 
-
 	#if defined(ESP32_WIFI)
 		Serial.begin(115200);
 		delay(10);
@@ -331,29 +331,34 @@ void setup(){
 		#define TEST_QUAT_DISP
 
 		unsigned long update_us = 1000000UL/ sensors.cimu_.SEN.begin_update_rate;
+		unsigned long prev_us = micros();
 
 		while(1){
-			if(sen_init==true){
+			unsigned long t =micros();
+			unsigned long duration_us = (t - prev_us);
+			if(sen_init==true && duration_us >= update_us){
+				prev_us = t;
 				//IMU.update();
-				sensors.updateIMU();
+				bool rc=sensors.updateIMU();
+				if(rc ==true){
+					#if defined(TEST_QUAT_DISP)
+						Serial.print("W:");
+						Serial.print(sensors.cimu_.quat[0]);  // W
+						Serial.print(" ,X:");
+						Serial.print(sensors.cimu_.quat[1]);  // X
+						Serial.print(" ,Y:");
+						Serial.print(sensors.cimu_.quat[2]);  // Y
+						Serial.print(" ,Z:");
+						Serial.print(sensors.cimu_.quat[3]);  // Z
+						Serial.print("\n");
+					#endif
 
-				#if defined(TEST_QUAT_DISP)
-					Serial.print("W:");
-					Serial.print(sensors.cimu_.quat[0]);  // W
-					Serial.print(" ,X:");
-					Serial.print(sensors.cimu_.quat[1]);  // X
-					Serial.print(" ,Y:");
-					Serial.print(sensors.cimu_.quat[2]);  // Y
-					Serial.print(" ,Z:");
-					Serial.print(sensors.cimu_.quat[3]);  // Z
-					Serial.print("\n");
-				#endif
-
-				if(wait_f==true){
-					if(waint_cnt<=0)
-						while(1) delay(1000);        //
-					else
-						waint_cnt--;
+					if(wait_f==true){
+						if(waint_cnt<=0)
+							while(1) delay(1000);        //
+						else
+							waint_cnt--;
+					}
 				}
 			}
 			//#if defined(IMU_SENSER6)
@@ -364,8 +369,42 @@ void setup(){
 			//	//delay(28);        // delay mill sec [ms] 38 [hz] -> 26 より、取れる。
 			//	//delay(26);        // delay mill sec [ms] 38 [hz] -> 途中で、取れなくなる。
 			//#endif
-			delayMicroseconds(update_us);  // micro sec
+			delayMicroseconds(10);  // micro sec
 		}
+	#endif
+
+	//#define TEST_3
+	// IMU の単体テスト用
+	#if defined(TEST_3)
+
+		Serial.begin(115200);
+		//Serial.begin(9600);
+
+		Serial.println("start IMU test");
+		// test IMU start
+		for(int i=0;i<4;i++){
+			if (0==sensors.initIMU()){
+			//if (0==IMU.begin(206)){
+				sen_init=true;
+				break;
+			}
+			delay(100);        // delay mill sec 1000 [ms]
+		}
+
+		Serial.print("sen_init=");
+		Serial.print(sen_init);
+		Serial.print("\n");
+		delay(1000);        // delay mill sec 1000 [ms]
+
+
+		// start IMU Update Task. add by nishi 2021.8.9
+		xTaskCreatePinnedToCore(
+			update_motor,"update_motor",4096,NULL,1,&th[0],1);
+		//xTaskCreatePinnedToCore(
+		//	update_motor,"update_motor",4096*3,NULL,255,&th[0],0);
+
+		while(1)
+			delay(1000);
 	#endif
 
 	//------------------
@@ -729,7 +768,7 @@ void loop_main(){
 				// DMP のデータ切断のチェックをする。
 				//#define DEBUG_CHK_DMP_SIGNAL
 				//#if defined(DEBUG_CHK_DMP_SIGNAL)
-				#if !defined(MADG_DRIFT_CHECK)
+				#if !defined(MADG_DRIFT_CHECK) && !defined(DMP_RAW_CHECK)
 					double roll,pitch,yaw;
 					foxbot3::QuaternionToEulerAngles(q,roll,pitch,yaw);
 					debug_right.x = roll;
@@ -1206,6 +1245,9 @@ void update_motor(void *pvParameters){
 	roll_prev = pitch_prev = yaw_prev = 0.0;
 
 	unsigned long update_us = 1000000UL/ sensors.cimu_.SEN.begin_update_rate;
+	#if defined(TEST_3)
+		Serial.println("start update_motor():#1");
+	#endif
 
 	while(1){
 		//uint32_t t = millis();
@@ -1338,11 +1380,37 @@ void update_motor(void *pvParameters){
 			if(sen_init==true){
 				// IMU device へのデータアクセスを行う。
 				if(sensors.updateIMU()==true){
-					ac_cnt2++;
+					//ac_cnt2++;
 					portENTER_CRITICAL(&mutex);
+					ac_cnt2++;
 					// dmp9 で、どれくらい成功しているか、カウントする?
 					// Turtlebot3Sensor Object へデータをコピー
 					sensors.copyIMU();
+					#if defined(DMP_RAW_CHECK)
+						// なまのオイラー現在値
+						//foxbot3::QuaternionToEulerAngles(sensors.cimu_.SEN.quatRAW,roll,pitch,yaw);
+						//debug_right.x = roll;		// x
+						//debug_right.y = pitch;		// Y
+						//debug_right.z = yaw;		// z
+
+						// 生のquat
+						debug_right.x = sensors.cimu_.SEN.quatRAW[1];		// x
+						debug_right.y = sensors.cimu_.SEN.quatRAW[2];		// Y
+						debug_right.z = sensors.cimu_.SEN.quatRAW[3];		// z
+					#endif
+
+					#if defined(TEST_3)
+						Serial.print("W:");
+						Serial.print(sensors.cimu_.quat[0]);  // W
+						Serial.print(" ,X:");
+						Serial.print(sensors.cimu_.quat[1]);  // X
+						Serial.print(" ,Y:");
+						Serial.print(sensors.cimu_.quat[2]);  // Y
+						Serial.print(" ,Z:");
+						Serial.print(sensors.cimu_.quat[3]);  // Z
+						Serial.print("\n");
+					#endif
+
 					portEXIT_CRITICAL(&mutex);
 				}
 			}
@@ -1441,7 +1509,7 @@ void update_motor(void *pvParameters){
 			// IMU を静止した状態でチェックします。
 			// 下記コマンドで確認できる。
 			// $ ros2 topic echo /debug_right
-			#if defined(MADG_DRIFT_CHECK)
+			#if defined(MADG_DRIFT_CHECK) && !defined(DMP_RAW_CHECK)
 				foxbot3::QuaternionToEulerAngles(sensors.cimu_.quat,roll,pitch,yaw);
 				debug_right.x = (roll-roll_prev)/4.0;		// x: 0.00017295989874542908 + 0.00014397176419547741
 				debug_right.y = (pitch-pitch_prev)/4.0;		// y: 3.0994553855923264e-05
