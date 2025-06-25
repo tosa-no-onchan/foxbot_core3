@@ -90,6 +90,9 @@ Active Slam
     ...  
     }  
 
+    5.3 down load BNO086 SparkFun ArduinoLibrary  
+    $ git clone https://github.com/sparkfun/SparkFun_BNO08x_Arduino_Library.git  to here 
+
 #### 6. Import source code to Vscode Platformio IDE project  
 start vscode  
     
@@ -197,3 +200,15 @@ portEXIT_CRITICAL(&mutex);
 
 これに関する記事。  
 [ROS2 自作 Turtlebot3 による 草刈りロボット開発。#11 ロボットの走行方向がずれる。](https://www.netosa.com/blog/2025/03/ros2-turtlebot3-11.html)  
+
+2025.6.25  
+
+      1) BNO086 DMP 9軸 Fusion を使うことにした。  
+      $ git clone https://github.com/sparkfun/SparkFun_BNO08x_Arduino_Library.git to ~/Arduino/lib-foxbot_core3_r2  
+      Edit ~/Arduino/lib-foxbot_core3_r2/IMU/IMU.h  
+``````
+      //#include "ICM20948.h"  
+      #include "BNO086.h"  
+
+``````
+
