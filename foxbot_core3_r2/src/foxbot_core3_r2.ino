@@ -475,6 +475,18 @@ void setup(){
 	q_prev[2]=0.0;
 	q_prev[3]=0.0;
 
+	// 自作 Turtlebot3 の車体の傾の補正値。 add by nishi 2025.6.21
+	// IMU DMP の場合、キャリブレーション後の、 x,y は、IMU自体 の傾きを出しているものとする。
+	// Madgwick,Mahony のキャリブレーションでは、x,y は、0 補正されているので、この作業はできない。
+	// ロボットを平らな場所で、起動させて、ロボット自体の傾き(Roll,Pitch) が、 0 になるようにする。
+	// Rviz2 の TF と、 $ ros2 topic echo /debug_right で確認する。
+	// 基本は、/debug_right の x,y が、 0 になるように、逆の値を、補正値とする。
+	// y(pitch) < 0 だと、robot 前上り。 y > 0 robot 前下り
+	// 床の傾きを反映するようにする。
+	// 床が、前下り   -> y > 0
+	// 床が、前上がり -> y > 0
+	foxbot3::euler_to_quat<double>((0.029593099677307663-0.017842030929861176)/2.0, (0.03781347133215712 + 0.02501328678268437)/2.0,0.0,q_Zero);
+
 	frequency_odometry_hz = (unsigned long)(1000000.0 / FREQUENCY_ODOMETRY_HZ);	// 1 cycle time[micro sec] add by nishi 2022.3.21
 	frequency_odometry_hz_ave = frequency_odometry_hz;
 	setup_end = true;
@@ -679,7 +691,7 @@ void loop() {
 
 void loop_main(){
 	//bool imu_exec=false;
-	CB cb;
+	foxbot3::CB cb;
 	double dlt[3];
 
 	// add by nishi
@@ -804,32 +816,22 @@ void loop_main(){
 				else q[0] = sqrt(q[0] * -1.0) * -1.0;
 			#endif
 
-			//sensors.cimu_.compCB(q_tmp,&cb);
-			sensors.cimu_.compCBd(q,&cb);
-
-			//q_prev[0]=q[0];
-			//q_prev[1]=q[1];
-			//q_prev[2]=q[2];
-			//q_prev[3]=q[3];
-			double dx1,dy1,dz1;
-
-			#if defined(TEST_10_x3)
-				cnt4++;
-				if (cnt4==0)
-					linear_velocity_est=0.0;
-				else if(cnt4==1)
-					linear_velocity_est=0.005;
-				else if(cnt4==2)
-					linear_velocity_est=0.002;
-				else if(cnt4==3)
-					linear_velocity_est=-0.002;
-				else if(cnt4==4)
-					linear_velocity_est=0.0;
-				else{
-					linear_velocity_est=-0.005;
-					cnt4=0;
-				}
+			#define USE_ROBOT_POSE_ADJUST
+			// 自作Turtlebot3 の 車体の傾きを補正する
+			#if defined(USE_ROBOT_POSE_ADJUST)
+				// 自作 Turtlebot3 の 前傾の補正をする。 add by nishi 2025.6.21
+				foxbot3::Kakezan<double>(q, q_Zero, q_tmp);
+				q[0]=q_tmp[0];
+				q[1]=q_tmp[1];
+				q[2]=q_tmp[2];
+				q[3]=q_tmp[3];
 			#endif
+
+			// IMUの傾きに応じた、ロボットの移動距離を求める。
+			//sensors.cimu_.compCB(q_tmp,&cb);
+			foxbot3::compCB<double>(q,&cb);
+
+			double dx1,dy1,dz1;
 
 			dx1 = linear_velocity_est * dt;
 			dy1 = 0.0;
@@ -841,11 +843,14 @@ void loop_main(){
 
 			dx = dlt[0];
 			dy = dlt[1];
-			dz = dlt[2];
 
-			//if (fabs(dx) < 0.00025){
-			//	dz=0.0;
-			//}
+			#define USE_ROBOT_VERTICAL_LEVEL
+			// 自作Turtlebot3 の virtical level を加える。
+			#if defined(USE_ROBOT_VERTICAL_LEVEL)
+				dz = dlt[2];
+			#else
+				dz = 0.0;
+			#endif
 
 			//#define TEST_10_x
 			#if defined(TEST_10_x)
@@ -856,6 +861,13 @@ void loop_main(){
 				SERIAL_PORT.print(F(" dz:"));
 				SERIAL_PORT.println(dz, 6);
 			#endif
+
+			// 自作 Turtlebot3 の、起動した時の、IMU の値。 2025.6.21
+			// IMU を取り替えたら、毎回チェックして、補正値をださないといけない。
+			// /debug_right の値。
+			//x: -0.029593099677307663 / 0.017842030929861176
+			//y: -0.03781347133215712  / -0.02501328678268437
+			//z: 0.0006822851624606264 / -0.0005895060747535202
 		#endif
 
 		// feed odom message
@@ -868,9 +880,8 @@ void loop_main(){
 		// set postion
 		odom_.pose.pose.position.x += dx;
 		odom_.pose.pose.position.y += dy;
-		odom_.pose.pose.position.z = 0.0;
-		// 下記は、しばらく止めます。 by nishi 2025.3.18
-		//odom_.pose.pose.position.z += dz;
+		odom_.pose.pose.position.z += dz;
+
 		// set pose
 		odom_.pose.pose.orientation.w = q[0];
 		odom_.pose.pose.orientation.x = q[1];

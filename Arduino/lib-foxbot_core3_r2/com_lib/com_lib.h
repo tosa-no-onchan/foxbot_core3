@@ -8,7 +8,11 @@
 #include <stdio.h>
 #include <time.h>
 
-
+// python3だと
+// import math
+// 180/math.pi 
+// 180/3.141592653589793 -> 57.29577951308232
+// 1[degree] -> 0.0174533[radian]    3.14/180
 #ifndef RADIANS_F
 #define RADIANS_F   57.29577951308232    // [deg/rad]
 #endif
@@ -17,6 +21,10 @@ namespace foxbot3{
 
 typedef unsigned long long usec_t;
 //typedef unsigned long  usec_t;
+
+struct CB{
+  double dt[3][3];
+};
 
 inline unsigned long micros_2(){
     //uint32_t m = millis();
@@ -243,6 +251,37 @@ void Kakezan(T *left,   T *right, T *ans)
   //return   ans;      
 }
 #endif
+
+
+/*
+* compCB()
+* クォータニオンを回転行列に変換する。
+*/
+template <typename T>
+void compCB(T q[4],CB *cb){
+
+    double q0q0 = q[0] * q[0];
+    double q0q1 = q[0] * q[1];
+    double q0q2 = q[0] * q[2];
+    double q0q3 = q[0] * q[3];
+    double q1q1 = q[1] * q[1];
+    double q1q2 = q[1] * q[2];
+    double q1q3 = q[1] * q[3];
+    double q2q2 = q[2] * q[2];
+    double q2q3 = q[2] * q[3];
+    double q3q3 = q[3] * q[3];
+
+    //double CB[3][3];
+    cb->dt[0][0] = q0q0+q1q1-q2q2-q3q3;
+    cb->dt[0][1] = 2.0*(q1q2-q0q3);
+    cb->dt[0][2] = 2.0*(q1q3+q0q2);
+    cb->dt[1][0] = 2.0*(q1q2+q0q3);
+    cb->dt[1][1] = q0q0-q1q1+q2q2-q3q3;
+    cb->dt[1][2] = 2.0*(q2q3-q0q1);
+    cb->dt[2][0] = 2.0*(q1q3-q0q2);
+    cb->dt[2][1] = 2.0*(q2q3+q0q1);
+    cb->dt[2][2] = q0q0-q1q1-q2q2+q3q3;
+}
 
 }
 #endif

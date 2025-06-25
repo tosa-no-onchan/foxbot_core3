@@ -23,13 +23,13 @@
 // changed by nishi
 //#include "MPU6500.h"
 
-#include "ICM20948.h"
+//#include "ICM20948.h"
 //#include "ICM20948_COMBI.h"
 
 //#include "LSM9DS1.h"
 
 // add by nishi 2025.3.31
-//#include "BNO086.h"
+#include "BNO086.h"
 
 //#include "ADAF_BNO086.h"
 

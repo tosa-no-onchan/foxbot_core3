@@ -1993,20 +1993,20 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
                          // gpm8
                          // gpm16
   // add by nishi 2025.3.30
-  #if defined(USE_ACC_2G)
+  #if defined(USE_DMP_ACC_2G)
     myFSS.a = gpm2;  // gpm2
-  #elif defined(USE_ACC_4G)
+  #elif defined(USE_DMP_ACC_4G)
     myFSS.a = gpm4;  // gpm4
   #else
     myFSS.a = gpm8;  // gpm8
   #endif
                    
 
-  #if defined(USE_GYRO_250)
+  #if defined(USE_DMP_GYRO_250)
     myFSS.g = dps250;
-  #elif defined(USE_GYRO_500)
+  #elif defined(USE_DMP_GYRO_500)
     myFSS.g = dps500;
-  #elif defined(USE_GYRO_1000)
+  #elif defined(USE_DMP_GYRO_1000)
     myFSS.g = dps1000;
   #else
     myFSS.g = dps2000;     // (ICM_20948_GYRO_CONFIG_1_FS_SEL_e)
@@ -2143,9 +2143,9 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
   // The DMP scales accel raw data internally to align 1g as 2^25
   // In order to align internal accel raw data 2^25 = 1g write 0x04000000 when FSR is 4g
   // add by nishi 2025.3.30
-  #if defined(USE_ACC_2G)
+  #if defined(USE_DMP_ACC_2G)
     const unsigned char accScale[4] = {0x01, 0x00, 0x00, 0x00};
-  #elif defined(USE_ACC_4G)
+  #elif defined(USE_DMP_ACC_4G)
     const unsigned char accScale[4] = {0x04, 0x00, 0x00, 0x00};
   #else
     const unsigned char accScale[4] = {0x08, 0x00, 0x00, 0x00};
@@ -2155,9 +2155,9 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
   // In order to output hardware unit data as configured FSR write 0x00040000 when FSR is 4g
 
   // add by nishi 2025.3.30
-  #if defined(USE_ACC_2G)
+  #if defined(USE_DMP_ACC_2G)
     const unsigned char accScale2[4] = {0x00, 0x01, 0x00, 0x00};
-  #elif defined(USE_ACC_4G)
+  #elif defined(USE_DMP_ACC_4G)
     const unsigned char accScale2[4] = {0x00, 0x04, 0x00, 0x00};
   #else
     const unsigned char accScale2[4] = {0x00, 0x08, 0x00, 0x00};
@@ -2205,7 +2205,7 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
   //            0=1125Hz sample rate, 1=562.5Hz sample rate, ... 4=225Hz sample rate, ...
   //            10=102.2727Hz sample rate, ... etc.
   // @param[in] gyro_level 0=250 dps, 1=500 dps, 2=1000 dps, 3=2000 dps
-  #if defined(USE_GYRO_250)
+  #if defined(USE_DMP_GYRO_250)
     result = setGyroSF(19, 0); if (result > worstResult) worstResult = result; // 19 = 55Hz (see above), 0 = 250dps (see above)
     //result = setGyroSF(4, 0); if (result > worstResult) worstResult = result; // 4 = 225Hz (see above), 0 = 250dps (see above)
     //result = setGyroSF(8, 0); if (result > worstResult) worstResult = result;   // 8 = 112Hz  (see above), 0 = 2500dps (see above)
@@ -2218,7 +2218,7 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
     //const unsigned char gyroFullScale[4] = {0x10, 0x00, 0x00, 0x00}; // 2000dps : 2^28
     const unsigned char gyroFullScale[4] = {0x02, 0x00, 0x00, 0x00}; // 500dps : 2^25
     result = writeDMPmems(GYRO_FULLSCALE, 4, &gyroFullScale[0]); if (result > worstResult) worstResult = result;
-  #elif defined(USE_GYRO_500)
+  #elif defined(USE_DMP_GYRO_500)
     result = setGyroSF(19, 1); if (result > worstResult) worstResult = result; // 19 = 55Hz (see above), 1 = 500dps (see above)
     //result = setGyroSF(4, 1); if (result > worstResult) worstResult = result; // 4 = 225Hz (see above), 1 = 500dps (see above)
     //result = setGyroSF(8, 1); if (result > worstResult) worstResult = result;   // 8 = 112Hz  (see above), 1 = 500dps (see above)
@@ -2231,7 +2231,7 @@ ICM_20948_Status_e ICM_20948::initializeDMP(void)
     //const unsigned char gyroFullScale[4] = {0x10, 0x00, 0x00, 0x00}; // 2000dps : 2^28
     const unsigned char gyroFullScale[4] = {0x04, 0x00, 0x00, 0x00}; // 500dps : 2^26
     result = writeDMPmems(GYRO_FULLSCALE, 4, &gyroFullScale[0]); if (result > worstResult) worstResult = result;
-  #elif defined(USE_GYRO_1000)
+  #elif defined(USE_DMP_GYRO_1000)
     result = setGyroSF(19, 2); if (result > worstResult) worstResult = result; // 19 = 55Hz (see above), 2 = 1000ps (see above)
     //result = setGyroSF(4, 2); if (result > worstResult) worstResult = result; // 4 = 225Hz (see above), 2 = 1000dps (see above)
     //result = setGyroSF(8, 2); if (result > worstResult) worstResult = result;   // 8 = 112Hz  (see above), 2 = 1000dps (see above)

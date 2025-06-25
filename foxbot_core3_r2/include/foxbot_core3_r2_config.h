@@ -142,8 +142,8 @@ static time_t time_seconds;
 #define FREQUENCY_CONTROLLER_HZ				50 			// 20[ms] -> 50[Hz]
 
 //---- odometry and tf publish rate ----
-//#define FREQUENCY_ODOMETRY_HZ             15.0d   // 15[hz]  Act ??[hz]
-#define FREQUENCY_ODOMETRY_HZ             12.0d   // 12[hz]  Act ??[hz] changed by nhishi 2023.3.3
+#define FREQUENCY_ODOMETRY_HZ             15.0d   // 15[hz]  Act ??[hz]
+//#define FREQUENCY_ODOMETRY_HZ             12.0d   // 12[hz]  Act ??[hz] changed by nhishi 2023.3.3
 
 //---- ros spin rate
 //#define FREQUENCY_ROSPINONCE_HZ				50		// 50[Hz] -> 20000[us]
@@ -151,8 +151,8 @@ static time_t time_seconds;
 
 //---- imu publish rate -----
 //#define FREQUENCY_IMU_PUBLISH_HZ            200  // 5[ms] -> 200[hz]
-//#define FREQUENCY_IMU_PUBLISH_HZ            15  // 15 [hz]
-#define FREQUENCY_IMU_PUBLISH_HZ            12  // 12 [hz]  changed by nishi 2023.3.3
+#define FREQUENCY_IMU_PUBLISH_HZ            15  // 15 [hz]
+//#define FREQUENCY_IMU_PUBLISH_HZ            12  // 12 [hz]  changed by nishi 2023.3.3
 
 //---- imu data copy rate ----
 #define FREQUENCY_IMU_DATA_HZ               100  // 100[hz]
@@ -349,6 +349,7 @@ void publishImuMsg(void);   // add by nishi 2021.7.5
 void update_motor(void *pvParameters);
 
 float q_prev[4];
+double q_Zero[4];
 // add by nishi end
 
 /* Velocity command subscriber */

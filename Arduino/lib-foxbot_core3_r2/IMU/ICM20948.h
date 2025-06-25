@@ -29,15 +29,15 @@
 #if defined(USE_FOXBOT)
 	// add by nishi
 	#define USE_SPARK_LIB
-	#define USE_ACC_NISHI
-	#define USE_GRYO_NISHI
+	//#define USE_ACC_NISHI
+	//#define USE_GRYO_NISHI
 	//#define USE_MAG
 	//#define USE_DUAL_RATE
 
-	//#define USE_DMP_NISHI
+	#define USE_DMP_NISHI
 
 	//#define USE_DUAL_FILTERS
-	#define USE_MADWICK
+	//#define USE_MADWICK
 	//#define USE_MAHONY
 
 	// add by nishi 2021.10.7
@@ -55,6 +55,9 @@
 	//#define USE_ODR500
 	#define USE_ODR1K
 
+	#define USE_DMP_ACC_2G
+	#define USE_DMP_GYRO_2000
+
 	#define USE_IMU_NO1
 	//#define USE_IMU_NO2
 	//#define USE_IMU_NO3
@@ -63,16 +66,16 @@
 #else
 	// add by nishi
 	#define USE_SPARK_LIB
-	#define USE_ACC_NISHI
-	#define USE_GRYO_NISHI
+	//#define USE_ACC_NISHI
+	//#define USE_GRYO_NISHI
 	//#define USE_MAG
 	//#define USE_DUAL_RATE
 
-	//#define USE_DMP_NISHI
+	#define USE_DMP_NISHI
 	//#define USE_AGM_NISHI		// DMP INV_ICM20948_SENSOR_GEOMAGNETIC_FIELD           (32-bit calibrated compass)
 
 	//#define USE_DUAL_FILTERS
-	#define USE_MADWICK
+	//#define USE_MADWICK
 	//#define USE_MAHONY
 
 	// add by nishi 2021.10.7
@@ -90,9 +93,12 @@
 	//#define USE_ODR500
 	#define USE_ODR1K
 
-	#define USE_IMU_NO1
+	#define USE_DMP_ACC_2G
+	#define USE_DMP_GYRO_2000
+
+	//#define USE_IMU_NO1
 	//#define USE_IMU_NO2
-	//#define USE_IMU_NO3
+	#define USE_IMU_NO3
 
 #endif
 
@@ -201,6 +207,9 @@
 		#define GYRO_NOISE_CUT_OFF 1.7
 		//#define GYRO_NOISE_CUT_OFF 2.0
 	#endif
+	#if defined(USE_ACC_4G)
+		#define ACC_NOISE_CUT_OFF 20
+	#endif
 #else
 	#if defined(USE_GYRO_250)
 		//#define GYRO_NOISE_CUT_OFF 8
@@ -212,6 +221,9 @@
 	#elif defined(USE_GYRO_2000)
 		#define GYRO_NOISE_CUT_OFF 1.7
 		//#define GYRO_NOISE_CUT_OFF 2.0
+	#endif
+	#if defined(USE_ACC_4G)
+		#define ACC_NOISE_CUT_OFF 20
 	#endif
 #endif
 
