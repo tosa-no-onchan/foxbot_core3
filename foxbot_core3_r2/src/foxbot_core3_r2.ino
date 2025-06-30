@@ -78,6 +78,7 @@
 
 //#define DMP_RAW_CHECK
 //#define MADG_DRIFT_CHECK
+#define ROBO_POS_CHECK
 
 // Multi task
 TaskHandle_t th[2];
@@ -483,9 +484,17 @@ void setup(){
 	// 基本は、/debug_right の x,y が、 0 になるように、逆の値を、補正値とする。
 	// y(pitch) < 0 だと、robot 前上り。 y > 0 robot 前下り
 	// 床の傾きを反映するようにする。
-	// 床が、前下り   -> y > 0
+	// 床が、前下り   -> y < 0
 	// 床が、前上がり -> y > 0
-	foxbot3::euler_to_quat<double>((0.029593099677307663-0.017842030929861176)/2.0, (0.03781347133215712 + 0.02501328678268437)/2.0,0.0,q_Zero);
+	// 
+	// ロボット が走行するにつれｔ、z が上に行く -> z が下に行くように補正する。 y>0 の補正  2025.6.30
+	//$ python3
+	//>>> import math
+	//>>> math.radians(0.2)
+	//0.003490658503988659
+
+	//foxbot3::euler_to_quat<double>((0.029593099677307663-0.017842030929861176)/2.0, (0.03781347133215712 + 0.02501328678268437)/2.0,0.0,q_Zero);
+	foxbot3::euler_to_quat<double>((0.029593099677307663-0.017842030929861176)/2.0, (0.03781347133215712 + 0.02501328678268437)/2.0 + 0.003490658503988659 ,0.0,q_Zero);
 
 	frequency_odometry_hz = (unsigned long)(1000000.0 / FREQUENCY_ODOMETRY_HZ);	// 1 cycle time[micro sec] add by nishi 2022.3.21
 	frequency_odometry_hz_ave = frequency_odometry_hz;
@@ -780,7 +789,7 @@ void loop_main(){
 				// DMP のデータ切断のチェックをする。
 				//#define DEBUG_CHK_DMP_SIGNAL
 				//#if defined(DEBUG_CHK_DMP_SIGNAL)
-				#if !defined(MADG_DRIFT_CHECK) && !defined(DMP_RAW_CHECK)
+				#if !defined(MADG_DRIFT_CHECK) && !defined(DMP_RAW_CHECK) && !defined(ROBO_POS_CHECK)
 					double roll,pitch,yaw;
 					foxbot3::QuaternionToEulerAngles(q,roll,pitch,yaw);
 					debug_right.x = roll;
@@ -900,6 +909,13 @@ void loop_main(){
 			SERIAL_PORT.print(odom_.pose.pose.position.y*10000.0, 8);
 			SERIAL_PORT.print(F(" z:"));
 			SERIAL_PORT.println(odom_.pose.pose.position.z*10000.0, 8);
+		#endif
+
+
+		#if !defined(MADG_DRIFT_CHECK) && !defined(DMP_RAW_CHECK) && defined(ROBO_POS_CHECK)
+			debug_right.x = odom_.pose.pose.position.x;
+			debug_right.y = odom_.pose.pose.position.y;
+			debug_right.z = odom_.pose.pose.position.z;
 		#endif
 
 		// error occured -> [ERROR] [1616575654.217167]: Message from device dropped: message larger than buffer.  by nishi
