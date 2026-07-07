@@ -283,5 +283,48 @@ void compCB(T q[4],CB *cb){
     cb->dt[2][2] = q0q0-q1q1-q2q2+q3q3;
 }
 
+
+/*
+* normalizeQuaternion()
+* 四元数を正規化する関数。
+* call:
+*   foxbot3::normalizeQuaternion<float>(q0,q1,q2,q3);
+*/
+template <typename T>
+void normalizeQuaternion(T &q0,T &q1,T &q2,T &q3){
+    T norm = sqrt(q0*q0 + q1*q1 + q2*q2 + q3*q3);
+    // ゼロ除算の防止
+    if (norm == (T)0.0) {
+        q0 = (T)1.0; // 初期状態（回転なし）に戻す
+        q1 = (T)0.0;
+        q2 = (T)0.0;
+        q3 = (T)0.0;
+        return;
+    }
+
+    q0 /= norm;   // w
+    q1 /= norm;   // x
+    q2 /= norm;   // y
+    q3 /= norm;   // z
+}
+
+template <typename T>
+void normalizeQuaternion_old(T q[4]){
+    T norm = sqrt(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
+    // ゼロ除算の防止
+    if (norm == 0.0) {
+        q[0] = (T)1.0; // 初期状態（回転なし）に戻す
+        q[1] = (T)0.0;
+        q[2] = (T)0.0;
+        q[3] = (T)0.0;
+        return;
+    }
+
+    q[0] /= norm;   // w
+    q[1] /= norm;   // x
+    q[2] /= norm;   // y
+    q[3] /= norm;   // z
+}
+
 }
 #endif

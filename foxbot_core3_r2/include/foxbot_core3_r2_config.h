@@ -45,7 +45,11 @@
 #include <tf2_msgs/msg/tf_message.h>
 
 // add by nishi
-#include <geometry_msgs/msg/twist.h>
+// /Arduino/lib-foxbot_core3_r2/micro_ros_arduino/src/geometry_msgs/msg
+//#include <geometry_msgs/msg/twist.h>
+// changed by nishi 2026.6.25
+#include <geometry_msgs/msg/twist_stamped.h>
+
 #include <nav_msgs/msg/odometry.h>
 //#include <std_msgs/msg/int32.h>
 
@@ -60,6 +64,16 @@
 // 1) enable whehter 'pc_beat' syncronize or not
 //#define USE_PC_BEAT
 //#define USE_FOX_BEAT
+
+// for src/rtabmap_ros_my/launch/foxbot_nav2_oak-d_depth_gps.launch.py
+//  1)#define USE_ODOM_FOX   -> odom_fox を有効にする。
+//  2)bool use_tf_static=false;   -> /tf を、 publish しない。
+//  3)bool use_imu_pub=true;
+//
+//  for src/rtabmap_ros_my/launch/rtabmap_oak-d_rgb_depth.launch.py
+//  1)#define USE_ODOM_FOX   -> /odom_fox publish を有効にする。
+//  2)bool use_tf_static=true;   -> /tf を、 publish する。
+//
 
 // 2) use odom topic name which '/odom' or '/odom_fox'  add by nishi 2023.4.4
 #define USE_ODOM_FOX
@@ -362,7 +376,9 @@ void pc_beatCallback(const void *pc_beat_msg);
 *******************************************************************************/
 // "cmd_vel"
 rcl_subscription_t cmd_vel_subscriber;
-geometry_msgs__msg__Twist cmd_vel_msg0;
+//geometry_msgs__msg__Twist cmd_vel_msg0;
+// changed by nishi 2026.6.25
+geometry_msgs__msg__TwistStamped cmd_vel_msg0;
 
 #if defined(USE_PC_BEAT)
     // "pc_beat"
@@ -547,9 +563,9 @@ char joint_state_header_frame_id[30];
 // change these params for your robot contorol 2
 //
 // add by nishi 2022.9.9
-// 3) use_tf_static==true : publist tf odom -> base_footprint 
-//bool use_tf_static=false;
-bool use_tf_static=true;
+// 3) use_tf_static==true : publist tf odom -> base_footprint
+bool use_tf_static=false;
+//bool use_tf_static=true;
 
 // 4) use_imu_pub==true : publist 'imu_fox' 
 bool use_imu_pub=true;

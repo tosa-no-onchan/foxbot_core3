@@ -331,6 +331,12 @@ public:
 
 	uint32_t begin_update_rate = 40;	// begin時の update() calling rate [Hz]
 
+	bool initialized = false;
+	bool calibration_mode = false;		// add by nishi 2026.27
+	float prev_yaw=0.0;			// add by nsihi 2026.27
+	const float MAX_ROTATION_SPEED = 6.28; // 物理限界の閾値設定: 判定の基準を MAX_ROTATION_SPEED（最大角速度の閾値、単位は rad/s）に委ねます。
+																				// 目安: 6.28 (1秒間に1周)
+	int calibration_cnt=0;
 
 public:
 	cBNO086();
@@ -352,7 +358,7 @@ public:
 
 	#if defined(USE_DMP_NISHI)
 		void dmp_init( void );
-		bool dmp_get_adc();
+		bool dmp_get_adc( void);
 		bool dmp_cali_get_done();
 	#endif
 

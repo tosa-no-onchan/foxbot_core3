@@ -139,9 +139,9 @@ void Turtlebot3Sensor::copyIMU(void){
 /*
 * copyIMU() で、一括コピーした自クラス上のデータをコール元へ渡す。
 */
-//sensor_msgs::Imu Turtlebot3Sensor::getIMU(void)
 void Turtlebot3Sensor::getIMU(sensor_msgs__msg__Imu &imu_msg)
 {
+  // set Gyro value
   //imu_msg_.angular_velocity.x = cimu_.SEN.gyroADC[0] * GYRO_FACTOR;
   imu_msg.angular_velocity.x = gyroADC_[0] * GYRO_FACTOR;
   //imu_msg_.angular_velocity.y = cimu_.SEN.gyroADC[1] * GYRO_FACTOR;
@@ -149,25 +149,17 @@ void Turtlebot3Sensor::getIMU(sensor_msgs__msg__Imu &imu_msg)
   //imu_msg_.angular_velocity.z = cimu_.SEN.gyroADC[2] * GYRO_FACTOR;
   imu_msg.angular_velocity.z = gyroADC_[2] * GYRO_FACTOR;
 
-  imu_msg.angular_velocity_covariance[0] = 0.02;
-  imu_msg.angular_velocity_covariance[1] = 0;
-  imu_msg.angular_velocity_covariance[2] = 0;
-  imu_msg.angular_velocity_covariance[3] = 0;
-  imu_msg.angular_velocity_covariance[4] = 0.02;
-  imu_msg.angular_velocity_covariance[5] = 0;
-  imu_msg.angular_velocity_covariance[6] = 0;
-  imu_msg.angular_velocity_covariance[7] = 0;
-  imu_msg.angular_velocity_covariance[8] = 0.02;
+  //imu_msg.angular_velocity_covariance[0] = 0.02;
+  //imu_msg.angular_velocity_covariance[1] = 0;
+  //imu_msg.angular_velocity_covariance[2] = 0;
+  //imu_msg.angular_velocity_covariance[3] = 0;
+  //imu_msg.angular_velocity_covariance[4] = 0.02;
+  //imu_msg.angular_velocity_covariance[5] = 0;
+  //imu_msg.angular_velocity_covariance[6] = 0;
+  //imu_msg.angular_velocity_covariance[7] = 0;
+  //imu_msg.angular_velocity_covariance[8] = 0.02;
 
-  //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR;
-  //imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR;
-  //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
-
-  // MPU6500
-  //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR - 2.65;
-  //imu_msg_.linear_acceleration.y = cimu_.SEN.accADC[1] * ACCEL_FACTOR + 0.8;
-  //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
-
+  // set Accel value
   // ICM-20948
   //imu_msg_.linear_acceleration.x = cimu_.SEN.accADC[0] * ACCEL_FACTOR;
   imu_msg.linear_acceleration.x = accADC_[0] * ACCEL_FACTOR;
@@ -176,38 +168,33 @@ void Turtlebot3Sensor::getIMU(sensor_msgs__msg__Imu &imu_msg)
   //imu_msg_.linear_acceleration.z = cimu_.SEN.accADC[2] * ACCEL_FACTOR;
   imu_msg.linear_acceleration.z = accADC_[2] * ACCEL_FACTOR;
 
-  imu_msg.linear_acceleration_covariance[0] = 0.04;
-  imu_msg.linear_acceleration_covariance[1] = 0;
-  imu_msg.linear_acceleration_covariance[2] = 0;
-  imu_msg.linear_acceleration_covariance[3] = 0;
-  imu_msg.linear_acceleration_covariance[4] = 0.04;
-  imu_msg.linear_acceleration_covariance[5] = 0;
-  imu_msg.linear_acceleration_covariance[6] = 0;
-  imu_msg.linear_acceleration_covariance[7] = 0;
-  imu_msg.linear_acceleration_covariance[8] = 0.04;
+  //imu_msg.linear_acceleration_covariance[0] = 0.04;
+  //imu_msg.linear_acceleration_covariance[1] = 0;
+  //imu_msg.linear_acceleration_covariance[2] = 0;
+  //imu_msg.linear_acceleration_covariance[3] = 0;
+  //imu_msg.linear_acceleration_covariance[4] = 0.04;
+  //imu_msg.linear_acceleration_covariance[5] = 0;
+  //imu_msg.linear_acceleration_covariance[6] = 0;
+  //imu_msg.linear_acceleration_covariance[7] = 0;
+  //imu_msg.linear_acceleration_covariance[8] = 0.04;
 
-  //imu_msg_.orientation.w = cimu_.quat[0];
-  //imu_msg_.orientation.x = cimu_.quat[1];
-  //imu_msg_.orientation.y = cimu_.quat[2];
-  //imu_msg_.orientation.z = cimu_.quat[3];
-
+  // set Pose value
   // MPU6500 & ICM-20948
   imu_msg.orientation.w = quat_[0];
   imu_msg.orientation.x = quat_[1];
   imu_msg.orientation.y = quat_[2];
   imu_msg.orientation.z = quat_[3];
 
-  imu_msg.orientation_covariance[0] = 0.0025;
-  imu_msg.orientation_covariance[1] = 0;
-  imu_msg.orientation_covariance[2] = 0;
-  imu_msg.orientation_covariance[3] = 0;
-  imu_msg.orientation_covariance[4] = 0.0025;
-  imu_msg.orientation_covariance[5] = 0;
-  imu_msg.orientation_covariance[6] = 0;
-  imu_msg.orientation_covariance[7] = 0;
-  imu_msg.orientation_covariance[8] = 0.0025;
+  //imu_msg.orientation_covariance[0] = 0.0025;
+  //imu_msg.orientation_covariance[1] = 0;
+  //imu_msg.orientation_covariance[2] = 0;
+  //imu_msg.orientation_covariance[3] = 0;
+  //imu_msg.orientation_covariance[4] = 0.0025;
+  //imu_msg.orientation_covariance[5] = 0;
+  //imu_msg.orientation_covariance[6] = 0;
+  //imu_msg.orientation_covariance[7] = 0;
+  //imu_msg.orientation_covariance[8] = 0.0025;
 
-  //return imu_msg_;
 }
 
 void Turtlebot3Sensor::calibrationGyro()

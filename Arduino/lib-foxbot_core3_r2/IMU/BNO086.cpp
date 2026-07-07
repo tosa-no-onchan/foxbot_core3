@@ -178,11 +178,15 @@ bool cBNO086::begin()
   #endif
 
   if(initialized == true){
+    //uint8_t sensors = SH2_CAL_ACCEL | SH2_CAL_GYRO | SH2_CAL_MAG;
+    //if (myIMU.setCalibrationConfig(sensors) == true) { // all three sensors
     if (myIMU.setCalibrationConfig(SH2_CAL_ACCEL || SH2_CAL_GYRO || SH2_CAL_MAG) == true) { // all three sensors
     //if (myIMU.setCalibrationConfig(SH2_CAL_ACCEL || SH2_CAL_GYRO) == true) { // 
     //if (myIMU.setCalibrationConfig(SH2_CAL_ACCEL || SH2_CAL_MAG) == true) { // Default settings
     //if (myIMU.setCalibrationConfig(SH2_CAL_ACCEL) == true) { // only accel
       Serial.println(F("Calibration Command Sent Successfully"));
+      calibration_mode = true;    // add by nishi 2026.6.27
+
     } 
     else {
       Serial.println("Could not send Calibration Command.");
@@ -271,8 +275,46 @@ bool cBNO086::update( void ){
   }
   // check data comming?
   bool rc=myIMU.getSensorEvent();
-  //SERIAL_PORT.print("cBNO086::update(): #99 rc:");
-  //SERIAL_PORT.println(rc);
+  SERIAL_PORT.print("cBNO086::update(): #2 rc:");
+  SERIAL_PORT.println(rc);
+  if(rc){
+    if (calibration_mode) {
+        // 各種データの更新
+        // (getYawなどを呼び出すことで、内部のデータバッファが更新されます)
+        float yaw = myIMU.getYaw();
+        // 2. 現在の精度ステータス(0~3)を取得
+        uint8_t quat_accuracy = myIMU.getQuatAccuracy();
+        
+        // 必要に応じて各個別のセンサー精度も監視可能
+        // uint8_t mag_accuracy = myIMU.getMagAccuracy();
+        // uint8_t accel_accuracy = myIMU.getAccelAccuracy();
+
+        SERIAL_PORT.print(F("Current Calibration Accuracy: "));
+        SERIAL_PORT.println(quat_accuracy);
+
+        calibration_cnt++;
+        // 3. 精度が「3（最上）」になったら完了とみなす
+        if (quat_accuracy == 3) {
+            SERIAL_PORT.println(F("Calibratio complete!!"));
+            
+            // 4. 校正結果をBNO086内部のフラッシュメモリ(DCDファイル)に保存
+            //myIMU.saveCalibrationConfig(); 
+            //SERIAL_PORT.println(F("Calibration saved to flash."));
+
+            // 5. 【超重要】前回の対策通り、走行中の暴れを防ぐため背景校正をすべてOFFにする
+            //myIMU.setCalibrationConfig(0, 0, 0);
+            //SERIAL_PORT.println(F("Background calibration disabled for safe running."));
+            
+            // add by nishi 2026.6.27
+            calibration_mode = false; // モード終了
+        }
+        else if (calibration_cnt > 200){
+            SERIAL_PORT.println(F("Calibratio time out!!"));
+            calibration_mode = false; // モード終了
+        }
+    }
+  }
+
   return rc;
 }
 
@@ -817,12 +859,23 @@ bool cBNO086::dmp_get_adc(){
   static byte f=0;
   static double q[4]={1.0, 0.0, 0.0, 0.0};
 
+  static unsigned long prev_process_time = micros();
+  static unsigned long cur_process_time = 0;
+  static unsigned long dt = 0;
+
+
   //#define TRACE_DMP1
   #if defined(TRACE_DMP1)
     SERIAL_PORT.println("dmp_get_adc() start");
   #endif
 
   bool rc=false;
+
+  bool check_yaw=true;
+
+  cur_process_time  = micros();
+  dt      = cur_process_time-prev_process_time;
+  //prev_process_time = cur_process_time;
 
   // is it the correct sensor data we want?
   if (myIMU.getSensorEventID() == SENSOR_REPORTID_ROTATION_VECTOR) {
@@ -832,154 +885,210 @@ bool cBNO086::dmp_get_adc(){
     //float quatK = myIMU.getQuatK();
     //float quatReal = myIMU.getQuatReal();
 
-
-    float q0 = myIMU.getQuatReal();
-    float q1 = myIMU.getQuatI();
-    float q2 = myIMU.getQuatJ();
-    float q3 = myIMU.getQuatK();
+    float q0 = myIMU.getQuatReal(); // W
+    float q1 = myIMU.getQuatI();    // q1
+    float q2 = myIMU.getQuatJ();    // q2
+    float q3 = myIMU.getQuatK();    // q3
     uint8_t Accuracy = myIMU.getQuatAccuracy();
     float quatRadianAccuracy = myIMU.getQuatRadianAccuracy();
+
+    //BNO086 (SparkFunライブラリ等):
+    //getQuatReal() が q₀ (W)、getQuatI() が q₁ (X)、getQuatJ() が q₂ (Y)、getQuatK() が q₃ (Z) に対応しています。
+
+    // クォータニオンからYaw（ラジアン）への変換式
+    float siny_cosp = 2.0 * (q0 * q3 + q1 * q2);
+    float cosy_cosp = 1.0 - 2.0 * (q2 * q2 + q3 * q3);
+    float yaw = atan2(siny_cosp, cosy_cosp); // 結果は -PI 〜 +PI [rad]
 
     //q0=1.0 - ((q1 * q1) + (q2 * q2) + (q3 * q3));
     //if(q0 >= 0.0) q0 = sqrt(q0);
     //else q0 = sqrt(q0 * -1.0) * -1.0;
 
-    #define QUAT_NORM
+    //#define QUAT_NORM
     #if defined(QUAT_NORM)
-    float norm = sqrt(q0*q0 + q1*q1 + q2*q2 + q3*q3);
-    q0 = q0/norm;
-    q1 = q1/norm;
-    q2 = q2/norm;
-    q3 = q3/norm;
+      float norm = sqrt(q0*q0 + q1*q1 + q2*q2 + q3*q3);
+      // ゼロ除算の防止
+      if (norm == 0.0f) {
+        q0 = 1.0f; // 初期状態（回転なし）に戻す
+        q1 = 0.0f;
+        q2 = 0.0f;
+        q3 = 0.0f;
+      }
+      else{
+        q0 = q0/norm; // w
+        q1 = q1/norm; // x
+        q2 = q2/norm; // y
+        q3 = q3/norm; // z
+      }
     #endif
+  	foxbot3::normalizeQuaternion<float>(q0,q1,q2,q3);
 
-    //#define TRACE_DMP1A
+    #define TRACE_DMP1A
     #if defined(TRACE_DMP1A)
-      //if(quatRadianAccuracy>0.0 && quatRadianAccuracy < quatRadianAccuracy_min){
-      //  quatRadianAccuracy_min=quatRadianAccuracy;
-      //}
-      //SERIAL_PORT.print(dqw, 2);
-      //SERIAL_PORT.print(F(","));
-      //SERIAL_PORT.print(dqx, 2);
-      //SERIAL_PORT.print(F(","));
-      //SERIAL_PORT.print(dqy, 2);
-      //SERIAL_PORT.print(F(","));
-      //SERIAL_PORT.print(dqz, 2);
-      //SERIAL_PORT.print(F(","));
       SERIAL_PORT.print(F("Acc: "));
       SERIAL_PORT.print(Accuracy);
       SERIAL_PORT.print(F(" ,RadianAccuracy: "));
       SERIAL_PORT.print(quatRadianAccuracy);
+      SERIAL_PORT.print(F(" ,yaw: "));
+      SERIAL_PORT.print(yaw);
       SERIAL_PORT.println();
     #endif
-
 
     //if(!isnan(q0) && Accuracy > 0 && quatRadianAccuracy > 0.04){
     if(!isnan(q0) && quatRadianAccuracy > 0.04){
     //if(!isnan(q0)){
-      quatRAW[0] = q0;    // changed by nishi 2025.3.14
-      quatRAW[1] = q1;    // changed by nishi 2025.3.14
-      quatRAW[2] = q2;    // changed by nishi 2025.3.14
-      quatRAW[3] = q3;    // changed by nishi 2025.3.14
 
-      //#define TRACE_DMP1B
-      #if defined(TRACE_DMP1B)
-        SERIAL_PORT.print(F("check OK"));
-        SERIAL_PORT.println();
-      #endif
+      // 1. ラップアラウンド（巡回）を考慮して、前回との差分を計算
+      float delta_angle = yaw - prev_yaw;
+      delta_angle = atan2(sin(delta_angle), cos(delta_angle)); // -PI ~ +PIに正規化
 
-
-      // キャリブレーション中です。
-      if(calibratingD_f == 0){
-        calibratingD++;
-        if(calibratingD >= MPU_CALI_COUNT_DMP_PRE){
-          if(calibratingD == MPU_CALI_COUNT_DMP_PRE){
-            d[1]=0;
-            d[2]=0;
-            d[3]=0;
-          }
-          d[1] += quatRAW[1];             // Sum up 512 readings
-          d[2] += quatRAW[2];             // Sum up 512 readings
-          d[3] += quatRAW[3];             // Sum up 512 readings
-
-          // キャリブレーションの終了回数に到達した。
-          if(calibratingD >= MPU_CALI_COUNT_DMP+MPU_CALI_COUNT_DMP_PRE-1){
-            // DMP の初期誤差を計算する。
-            // Z軸のみ補正します。by nishi 2025.3.17
-            #define USE_DMP_ADJUST_Z_ONLY
-            #if defined(USE_DMP_ADJUST_Z_ONLY)
-              quatZero[1] = 0.0;
-              quatZero[2] = 0.0;
-            #else
-              quatZero[1] = d[1] / MPU_CALI_COUNT_DMP;
-              quatZero[2] = d[2] / MPU_CALI_COUNT_DMP;
-            #endif
-            quatZero[3] = d[3] / MPU_CALI_COUNT_DMP; 
-
-            calibratingD_f=1;
-            calibratingD = 0;
-          }
-        }
-        // キャリブレーションが終了した直後です。
-        if (calibratingD_f == 1)
-        {
-          // DMP の誤差 quat の実数部を求める。
-          quatZero[0] = sqrt(1.0 - ((quatZero[1] * quatZero[1]) + (quatZero[2] * quatZero[2]) + (quatZero[3] * quatZero[3])));    //  -- W    こいつが、バグとの事。
-
-          //quatZero[0] =1.0 - ((quatZero[1] * quatZero[1]) + (quatZero[2] * quatZero[2]) + (quatZero[3] * quatZero[3]));
-          //if(quatZero[0] >= 0.0) quatZero[0] = sqrt(quatZero[0]);
-          //else quatZero[0] = sqrt(quatZero[0] * -1.0) * -1.0;
-
-          // DMP 誤差 quat の補正(共役)  --> 誤差の分だけ、反対方向に回転させる。
-          quatZeroK[1] = quatZero[1] * -1.0;
-          quatZeroK[2] = quatZero[2] * -1.0;
-          quatZeroK[3] = quatZero[3] * -1.0;
-          //quatZeroK[0] =1.0 - ((quatZeroK[1] * quatZeroK[1]) + (quatZeroK[2] * quatZeroK[2]) + (quatZeroK[3] * quatZeroK[3]));
-          //if(quatZeroK[0] >= 0.0) quatZeroK[0] = sqrt(quatZeroK[0]);
-          //else quatZeroK[0] = sqrt(quatZeroK[0] * -1.0) * -1.0;
-          quatZeroK[0]=quatZero[0];
-        }
+      // 2. dt [ms] の間の「擬似的な角速度 (rad/s)」を算出
+      float dt_sec = (float)dt / 1000.0;
+      float calculated_gyro_z = 0.0;
+      if (dt_sec > 0.0001) {
+          calculated_gyro_z = delta_angle / dt_sec;
       }
-      // キャリブレーション完了後です。
-      else{
-        // add by nishi 2025.3.16
-        // DMP の初期誤差だけ、補正します。
-        #define QUAT_CALIB
-        #if defined(QUAT_CALIB)
-          //double ans[4];
-          //foxbot3::Kakezan(quatZeroK, quatRAW, ans);
-          //foxbot3::Kakezan(ans, quatZero, quat);   // これをしたら、もとに戻る。
-          // 下の積の処理だけで、OK みたい。 by nishi 2025.3.15
-          foxbot3::Kakezan<double>(quatZeroK, quatRAW, quat);
 
-        #else
-          quat[0] = q0;
-          quat[1] = q1;
-          quat[2] = q2;
-          quat[3] = q3;
+      // 3. キャリブレーション飛びの判定
+      // 人間の物理的な限界（またはロボットの旋回上限）を超える角速度に達したかを評価します
+      // 例: MAX_ROTATION_SPEED = 6.28 (1秒間に1回転 = 2PI rad/s) などをヘッダー等で定義
+      if (abs(calculated_gyro_z) > MAX_ROTATION_SPEED) {
+
+          //#define TRACE_DMP1A1
+          #if defined(TRACE_DMP1A1)
+          // 【異常検知】キャリブレーションによる Yaw 飛びと判断
+          Serial.println(F("【警告】BNO086のキャリブレーション起因によるYawジャンプを検知・ブロックしました。"));
+          Serial.print(F("異常角速度 (rad/s): "));
+          Serial.println(calculated_gyro_z);
+          #endif
+          
+          // 前回の値を維持（ジャンプしたyawは無視。ジャイロを足せないのでその場に留まらせる）
+          check_yaw = false;
+      } 
+      else {
+          // 【正常】物理的にあり得る滑らかな変化なので値を採用
+          prev_yaw = yaw;
+          check_yaw = true; // 必要に応じて
+          prev_process_time = cur_process_time;
+      }
+
+      if(check_yaw==true){
+        quatRAW[0] = q0;    // changed by nishi 2025.3.14
+        quatRAW[1] = q1;    // changed by nishi 2025.3.14
+        quatRAW[2] = q2;    // changed by nishi 2025.3.14
+        quatRAW[3] = q3;    // changed by nishi 2025.3.14
+
+        //#define TRACE_DMP1B
+        #if defined(TRACE_DMP1B)
+          SERIAL_PORT.print(F("check OK"));
+          SERIAL_PORT.println();
         #endif
+
+        // キャリブレーション中です。
+        if(calibratingD_f == 0){
+          calibratingD++;
+          if(calibratingD >= MPU_CALI_COUNT_DMP_PRE){
+            if(calibratingD == MPU_CALI_COUNT_DMP_PRE){
+              d[1]=0;
+              d[2]=0;
+              d[3]=0;
+            }
+            d[1] += quatRAW[1];             // Sum up 512 readings
+            d[2] += quatRAW[2];             // Sum up 512 readings
+            d[3] += quatRAW[3];             // Sum up 512 readings
+
+            // キャリブレーションの終了回数に到達した。
+            if(calibratingD >= MPU_CALI_COUNT_DMP+MPU_CALI_COUNT_DMP_PRE-1){
+              // DMP の初期誤差を計算する。
+              // Z軸のみ補正します。by nishi 2025.3.17
+              #define USE_DMP_ADJUST_Z_ONLY
+              #if defined(USE_DMP_ADJUST_Z_ONLY)
+                quatZero[1] = 0.0;
+                quatZero[2] = 0.0;
+              #else
+                quatZero[1] = d[1] / MPU_CALI_COUNT_DMP;
+                quatZero[2] = d[2] / MPU_CALI_COUNT_DMP;
+              #endif
+              quatZero[3] = d[3] / MPU_CALI_COUNT_DMP; 
+
+              calibratingD_f=1;
+              calibratingD = 0;
+            }
+          }
+          // キャリブレーションが終了した直後です。
+          if (calibratingD_f == 1)
+          {
+            // DMP の誤差 quat の実数部を求める。
+            quatZero[0] = sqrt(1.0 - ((quatZero[1] * quatZero[1]) + (quatZero[2] * quatZero[2]) + (quatZero[3] * quatZero[3])));    //  -- W    こいつが、バグとの事。
+
+            //quatZero[0] =1.0 - ((quatZero[1] * quatZero[1]) + (quatZero[2] * quatZero[2]) + (quatZero[3] * quatZero[3]));
+            //if(quatZero[0] >= 0.0) quatZero[0] = sqrt(quatZero[0]);
+            //else quatZero[0] = sqrt(quatZero[0] * -1.0) * -1.0;
+
+            // DMP 誤差 quat の補正(共役)  --> 誤差の分だけ、反対方向に回転させる。
+            quatZeroK[1] = quatZero[1] * -1.0;
+            quatZeroK[2] = quatZero[2] * -1.0;
+            quatZeroK[3] = quatZero[3] * -1.0;
+            //quatZeroK[0] =1.0 - ((quatZeroK[1] * quatZeroK[1]) + (quatZeroK[2] * quatZeroK[2]) + (quatZeroK[3] * quatZeroK[3]));
+            //if(quatZeroK[0] >= 0.0) quatZeroK[0] = sqrt(quatZeroK[0]);
+            //else quatZeroK[0] = sqrt(quatZeroK[0] * -1.0) * -1.0;
+            quatZeroK[0]=quatZero[0];
+            prev_yaw=yaw;   // add by nishi 2026.6.28
+
+            //#define TRACE_DMP1C1
+            #if defined(TRACE_DMP1C1)
+            Serial.println(" cBNO086::dmp_get_adc() : #3 キャリブレーション complete");
+            #endif
+          }
+        }
+        // キャリブレーション完了後です。
+        else{
+          // add by nishi 2025.3.16
+          // DMP の初期誤差だけ、補正します。
+          #define QUAT_CALIB
+          #if defined(QUAT_CALIB)
+            //double ans[4];
+            //foxbot3::Kakezan(quatZeroK, quatRAW, ans);
+            //foxbot3::Kakezan(ans, quatZero, quat);   // これをしたら、もとに戻る。
+            // 下の積の処理だけで、OK みたい。 by nishi 2025.3.15
+            foxbot3::Kakezan<double>(quatZeroK, quatRAW, quat);
+
+          #else
+            quat[0] = q0;
+            quat[1] = q1;
+            quat[2] = q2;
+            quat[3] = q3;
+          #endif
+        }
+
+        //#define TRACE_DMP1B
+        #if defined(TRACE_DMP1B)
+          //SERIAL_PORT.print(dqw, 2);
+          //SERIAL_PORT.print(F(","));
+          //SERIAL_PORT.print(dqx, 2);
+          //SERIAL_PORT.print(F(","));
+          //SERIAL_PORT.print(dqy, 2);
+          //SERIAL_PORT.print(F(","));
+          //SERIAL_PORT.print(dqz, 2);
+          //SERIAL_PORT.print(F(","));
+          SERIAL_PORT.print(F("Acc: "));
+          SERIAL_PORT.print(quatRadianAccuracy, 2);
+          SERIAL_PORT.println();
+        #endif
+
+        //quat[0] = (double)dqw;
+        //quat[1] = (double)dqx;
+        //quat[2] = (double)dqy;
+        //quat[3] = (double)dqz;
+        rc=true;
       }
-
-      //#define TRACE_DMP1B
-      #if defined(TRACE_DMP1B)
-        //SERIAL_PORT.print(dqw, 2);
-        //SERIAL_PORT.print(F(","));
-        //SERIAL_PORT.print(dqx, 2);
-        //SERIAL_PORT.print(F(","));
-        //SERIAL_PORT.print(dqy, 2);
-        //SERIAL_PORT.print(F(","));
-        //SERIAL_PORT.print(dqz, 2);
-        //SERIAL_PORT.print(F(","));
-        SERIAL_PORT.print(F("Acc: "));
-        SERIAL_PORT.print(quatRadianAccuracy, 2);
-        SERIAL_PORT.println();
+    }
+    else{
+      //#define TRACE_DMP1C2
+      #if defined(TRACE_DMP1C2)
+      Serial.print(" cBNO086::dmp_get_adc() : #4 quatRadianAccuracy:");
+      Serial.println(quatRadianAccuracy);
       #endif
-
-      //quat[0] = (double)dqw;
-      //quat[1] = (double)dqx;
-      //quat[2] = (double)dqy;
-      //quat[3] = (double)dqz;
-      rc=true;
     }
   }
   return rc;

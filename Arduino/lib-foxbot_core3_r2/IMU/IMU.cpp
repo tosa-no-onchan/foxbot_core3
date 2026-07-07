@@ -171,7 +171,11 @@ bool cIMU::update( uint32_t option ){
   //UNUSED(option);
   bool rc;
 
-  rc=SEN.update();
+  #if defined(BNO086_IMU)
+    rc=SEN.update();
+  #else
+    rc=SEN.update();
+  #endif
   if(rc ==false){
     return rc;
   }
@@ -280,7 +284,6 @@ bool cIMU::computeIMU( void ){
   #if defined(TEST_computeIMU_2)
     SERIAL_PORT.println(F("cIMU::computeIMU(): #3"));
   #endif
-
 
   #if defined(USE_ACC_NISHI_X)
     // ACC 平滑化

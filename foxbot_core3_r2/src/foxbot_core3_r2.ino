@@ -87,7 +87,6 @@ portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
 
 int cnt4=0;
 
-
 const void euler_to_quat(float x, float y, float z, double* q) {
     float c1 = cos((y*3.14/180.0)/2);
     float c2 = cos((z*3.14/180.0)/2);
@@ -190,8 +189,8 @@ void set_my_time(int timeout_ms){
 	if (RCL_RET_OK  != rmw_uros_sync_session(timeout_ms))
 		return;
 	
-	int64_t time_ms = rmw_uros_epoch_millis(); 
-    int64_t time_ns = rmw_uros_epoch_nanos();
+	int64_t time_ms = rmw_uros_epoch_millis();
+  int64_t time_ns = rmw_uros_epoch_nanos();
 	unsigned long t = millis();
 
 	if (time_ms > 0){
@@ -310,7 +309,10 @@ void setup(){
 	// IMU の単体テスト用
 	#if defined(TEST_2)
 		Serial.begin(115200);
-		Serial.println("start IMU test");
+		Serial.println("start IMU test2");
+		Serial.print("sensors.cimu_.SEN.begin_update_rate:");
+		Serial.println(sensors.cimu_.SEN.begin_update_rate);
+		// 150
 		// test IMU start
 		for(int i=0;i<4;i++){
 			if (0==sensors.initIMU()){
@@ -381,7 +383,7 @@ void setup(){
 		Serial.begin(115200);
 		//Serial.begin(9600);
 
-		Serial.println("start IMU test");
+		Serial.println("start IMU test3");
 		// test IMU start
 		for(int i=0;i<4;i++){
 			if (0==sensors.initIMU()){
@@ -462,6 +464,8 @@ void setup(){
 	// Setting for SLAM and navigation (odometry, joint states, TF)
 	initOdom();
 	initJointStates();
+	initImu();	// add by nishi 2026.7.6
+
 	//prev_update_time = micros();
     setup_end = true;
 	//Serial.println("setup end");
@@ -492,9 +496,15 @@ void setup(){
 	//>>> import math
 	//>>> math.radians(0.2)
 	//0.003490658503988659
+	//>>> math.radians(0.3)
+	//0.005235987755982988
+	//>>> math.radians(0.4)
+	//0.006981317007977318
 
 	//foxbot3::euler_to_quat<double>((0.029593099677307663-0.017842030929861176)/2.0, (0.03781347133215712 + 0.02501328678268437)/2.0,0.0,q_Zero);
-	foxbot3::euler_to_quat<double>((0.029593099677307663-0.017842030929861176)/2.0, (0.03781347133215712 + 0.02501328678268437)/2.0 + 0.003490658503988659 ,0.0,q_Zero);
+	//foxbot3::euler_to_quat<double>((0.029593099677307663-0.017842030929861176)/2.0, (0.03781347133215712 + 0.02501328678268437)/2.0 + 0.003490658503988659, 0.0, q_Zero);
+	//foxbot3::euler_to_quat<double>((0.029593099677307663-0.017842030929861176)/2.0, (0.03781347133215712 + 0.02501328678268437)/2.0 + 0.005235987755982988, 0.0, q_Zero);
+	foxbot3::euler_to_quat<double>((0.029593099677307663-0.017842030929861176)/2.0, (0.03781347133215712 + 0.02501328678268437)/2.0 + 0.006981317007977318, 0.0, q_Zero);
 
 	frequency_odometry_hz = (unsigned long)(1000000.0 / FREQUENCY_ODOMETRY_HZ);	// 1 cycle time[micro sec] add by nishi 2022.3.21
 	frequency_odometry_hz_ave = frequency_odometry_hz;
@@ -830,11 +840,13 @@ void loop_main(){
 			#if defined(USE_ROBOT_POSE_ADJUST)
 				// 自作 Turtlebot3 の 前傾の補正をする。 add by nishi 2025.6.21
 				foxbot3::Kakezan<double>(q, q_Zero, q_tmp);
-				q[0]=q_tmp[0];
-				q[1]=q_tmp[1];
-				q[2]=q_tmp[2];
-				q[3]=q_tmp[3];
+				q[0]=q_tmp[0];	// w
+				q[1]=q_tmp[1];	// x
+				q[2]=q_tmp[2];	// y
+				q[3]=q_tmp[3];	// z
 			#endif
+
+			foxbot3::normalizeQuaternion<double>(q[0],q[1],q[2],q[3]);
 
 			// IMUの傾きに応じた、ロボットの移動距離を求める。
 			//sensors.cimu_.compCB(q_tmp,&cb);
@@ -935,9 +947,9 @@ void loop_main(){
 			//odom_tf.header.stamp = odom_.header.stamp;
 
 			// set time stamp
-		    tf_message->transforms.data[0].header.stamp.nanosec = tv.tv_nsec;
+		  tf_message->transforms.data[0].header.stamp.nanosec = tv.tv_nsec;
 			//tf_message->transforms.data[0].header.stamp.nanosec = time_ns;
-		    tf_message->transforms.data[0].header.stamp.sec = tv.tv_sec;
+		  tf_message->transforms.data[0].header.stamp.sec = tv.tv_sec;
 			//tf_message->transforms.data[0].header.stamp.sec = time_seconds;
 
 			// ratbmap-nishi_stereo_outdoor.launch と TF がバッテイングする? 2021.9.16
@@ -985,7 +997,7 @@ void loop_main(){
 	    //tTime[3] = t + (1000000UL / FREQUENCY_IMU_PUBLISH_HZ);
 	    tTime[3] = t;
 		if(use_imu_pub==true){
-	    	publishImuMsg();
+	    	publishImuMsg(tv);
 		}
 		#if defined(USE_MAG_X)
 		    publishMagMsg();
@@ -1018,15 +1030,26 @@ void loop_main(){
 
 }
 
-
 //twist message cb
+//void commandVelocityCallback(const void *cmd_vel_msg){
+//	const geometry_msgs__msg__Twist * msg = (const geometry_msgs__msg__Twist *)cmd_vel_msg;
+//	// if velocity in x direction is 0 turn off LED, if 1 turn on LED
+//	//digitalWrite(LED_PIN, (msg->linear.x == 0) ? LOW : HIGH);
+//	if(state == AGENT_CONNECTED && beat_ok==true){
+//		linear_velocity_ref  = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->linear.x;
+//		angular_velocity_ref = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->angular.z;
+//	}
+//}
+
+// ROS2 Jazzy Backport Twist -> TwistStamped
+// changed by nishi 2026.6.25
 void commandVelocityCallback(const void *cmd_vel_msg){
-	const geometry_msgs__msg__Twist * msg = (const geometry_msgs__msg__Twist *)cmd_vel_msg;
+	const geometry_msgs__msg__TwistStamped * msg = (const geometry_msgs__msg__TwistStamped *)cmd_vel_msg;
 	// if velocity in x direction is 0 turn off LED, if 1 turn on LED
 	//digitalWrite(LED_PIN, (msg->linear.x == 0) ? LOW : HIGH);
 	if(state == AGENT_CONNECTED && beat_ok==true){
-		linear_velocity_ref  = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->linear.x;
-		angular_velocity_ref = ((const geometry_msgs__msg__Twist *)cmd_vel_msg)->angular.z;
+		linear_velocity_ref  = ((const geometry_msgs__msg__TwistStamped *)cmd_vel_msg)->twist.linear.x;
+		angular_velocity_ref = ((const geometry_msgs__msg__TwistStamped *)cmd_vel_msg)->twist.angular.z;
 	}
 }
 
@@ -1173,11 +1196,20 @@ bool create_entities()
 	#endif
 
 	// create subscriber for Twist "cmd_vel"
+	//RCCHECK_PROC("create_entities() #9 : init cmd_vel_subscriber",
+	//	rclc_subscription_init_default(
+	//		&cmd_vel_subscriber,
+	//		&node,
+	//		ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+	//		"cmd_vel"));
+
+	// ROS2 Jazzy Backport  Twist -> TwistStamped
+	// changed by nishi 2026.6.25
 	RCCHECK_PROC("create_entities() #9 : init cmd_vel_subscriber",
 		rclc_subscription_init_default(
 			&cmd_vel_subscriber,
 			&node,
-			ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+			ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, TwistStamped),
 			"cmd_vel"));
 
 	#if defined(USE_PC_BEAT)
@@ -1400,7 +1432,7 @@ void update_motor(void *pvParameters){
 		//	tTime[4] = t + (1000000UL / FREQUENCY_IMU_DATA_HZ);
 		//}
 
-	    if ((t - tTime[6]) >= update_us){
+    if ((t - tTime[6]) >= update_us){
 			// add by nishi 2025.4.11
 			tTime[6] = t;
 			//Serial.println("start update_imu()");
@@ -1710,7 +1742,7 @@ void updateGyroCali(bool isConnected)
 * Publish msgs (IMU data: angular velocity, linear acceleration, orientation)
 * https://github.com/micro-ROS/micro_ros_arduino/issues/881
 *******************************************************************************/
-void publishImuMsg(void)
+void publishImuMsg(timespec tv)
 {
 	// add by nishi 2025.3.9
 	portENTER_CRITICAL(&mutex);
@@ -1718,7 +1750,9 @@ void publishImuMsg(void)
 	// add by nishi 2025.3.9
 	portEXIT_CRITICAL(&mutex);
 
-	imu_msg.header.stamp    = rosNow();		// Now dummy
+	//imu_msg.header.stamp    = rosNow();		// Now dummy
+	imu_msg.header.stamp.sec = tv.tv_sec;
+	imu_msg.header.stamp.nanosec = tv.tv_nsec;
 	imu_msg.header.frame_id.data = imu_frame_id;
 	imu_msg.header.frame_id.size = strlen(imu_frame_id);
 	imu_msg.header.frame_id.capacity = sizeof(imu_frame_id);
@@ -1804,7 +1838,7 @@ void updateVariable(bool isConnected)
 		}
 	  #endif
 
-      initOdom();
+    initOdom();
 
 	  dzi[0]=0;
 	  dzi[1]=0;
@@ -2022,32 +2056,74 @@ void initOdom(void)
 {
   init_encoder = true;
 
-  #if defined(USE_ROS1)
-  for (int index = 0; index < 3; index++)
-  {
-    odom_pose[index] = 0.0;
-    odom_vel[index]  = 0.0;
-  }
+	// add for UKF by nishi 2026.6.7
+	// --- 1. 位置と姿勢の共分散 (pose.covariance) ---
+	// 配列を一度0で初期化（micro-ROSの初期化で通常0になっていますが念のため）
+	for(int i = 0; i < 36; i++) {
+		odom_.pose.covariance[i] = 0.0;
+	}
+	// 対角成分に値をセット (例: 1e-3 = 0.001 程度)
+	odom_.pose.covariance[0]  = 0.001; // X位置の分散
+	odom_.pose.covariance[7]  = 0.001; // Y位置の分散
+	odom_.pose.covariance[14] = 0.001; // Z位置の分散
+	odom_.pose.covariance[21] = 0.001; // Rollの分散
+	odom_.pose.covariance[28] = 0.001; // Pitchの分散
+	odom_.pose.covariance[35] = 0.001; // Yawの分散
 
-  odom_.pose.pose.position.x = 0.0;
-  odom_.pose.pose.position.y = 0.0;
-  odom_.pose.pose.position.z = 0.0;
-
-  odom_.pose.pose.orientation.x = 0.0;
-  odom_.pose.pose.orientation.y = 0.0;
-  odom_.pose.pose.orientation.z = 0.0;
-  odom_.pose.pose.orientation.w = 1.0;
-
-  odom_.twist.twist.linear.x  = 0.0;
-  odom_.twist.twist.angular.z = 0.0;
-
-  motor_tic.left=0;		// add by nishi
-  motor_tic.right=0;	// add by nishi
-
-  yaw_est=0.;			// add by nishi
-  #endif
+	// --- 2. 速度と角速度の共分散 (twist.covariance) ---
+	for(int i = 0; i < 36; i++) {
+		odom_.twist.covariance[i] = 0.0;
+	}
+	// 対角成分に値をセット
+	odom_.twist.covariance[0]  = 0.001; // X速度の分散
+	odom_.twist.covariance[7]  = 0.001; // Y速度の分散
+	odom_.twist.covariance[14] = 0.001; // Z速度の分散
+	odom_.twist.covariance[21] = 0.001; // Roll角速度の分散
+	odom_.twist.covariance[28] = 0.001; // Pitch角速度の分散
+	odom_.twist.covariance[35] = 0.001; // Yaw角速度の分散
 
 }
+
+/*******************************************************************************
+* Initialization imu data
+*******************************************************************************/
+void initImu(void){
+
+  // set Gyro noise
+  imu_msg.angular_velocity_covariance[0] = 0.02;
+  imu_msg.angular_velocity_covariance[1] = 0;
+  imu_msg.angular_velocity_covariance[2] = 0;
+  imu_msg.angular_velocity_covariance[3] = 0;
+  imu_msg.angular_velocity_covariance[4] = 0.02;
+  imu_msg.angular_velocity_covariance[5] = 0;
+  imu_msg.angular_velocity_covariance[6] = 0;
+  imu_msg.angular_velocity_covariance[7] = 0;
+  imu_msg.angular_velocity_covariance[8] = 0.02;
+
+  // set Accel noise
+  imu_msg.linear_acceleration_covariance[0] = 0.04;
+  imu_msg.linear_acceleration_covariance[1] = 0;
+  imu_msg.linear_acceleration_covariance[2] = 0;
+  imu_msg.linear_acceleration_covariance[3] = 0;
+  imu_msg.linear_acceleration_covariance[4] = 0.04;
+  imu_msg.linear_acceleration_covariance[5] = 0;
+  imu_msg.linear_acceleration_covariance[6] = 0;
+  imu_msg.linear_acceleration_covariance[7] = 0;
+  imu_msg.linear_acceleration_covariance[8] = 0.04;
+ 
+  // set Pose noise
+  imu_msg.orientation_covariance[0] = 0.0025;
+  imu_msg.orientation_covariance[1] = 0;
+  imu_msg.orientation_covariance[2] = 0;
+  imu_msg.orientation_covariance[3] = 0;
+  imu_msg.orientation_covariance[4] = 0.0025;
+  imu_msg.orientation_covariance[5] = 0;
+  imu_msg.orientation_covariance[6] = 0;
+  imu_msg.orientation_covariance[7] = 0;
+  imu_msg.orientation_covariance[8] = 0.0025;
+
+}
+
 /*******************************************************************************
 * Initialization joint states data
 *******************************************************************************/
