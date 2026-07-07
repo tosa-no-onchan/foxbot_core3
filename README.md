@@ -212,3 +212,11 @@ portEXIT_CRITICAL(&mutex);
 
 ``````
 
+2026.7.7  
+
+      1) Ros2 Jazzy の backport に合わせて、/cmd_vel の topic を、TwistStamped に変更。  
+      2) BNO086 6 軸 DMP の、定期的キャリブレーションで、yaw が一瞬ずれるトラブルに対応しました。  
+      3) robot_localization/ukf_node の、/odom_fox、/imu の厳しいチェックに対応する様に対応しました。  
+      具体的には、/odom_fox、/imu topic のズレ判定用のノイズ値を、all 0.0 から、適宜基準値に設定しました。  
+      /imu header の timestamp が設定されていなかったので、修正しました。  
+
